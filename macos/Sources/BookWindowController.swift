@@ -30,7 +30,7 @@ final class BookWindowController: NSWindowController, NSWindowDelegate, NSToolba
             backing: .buffered,
             defer: false
         )
-        window.title = "Library"
+        window.title = tr("Library", "Bibliothek")
         window.minSize = NSSize(width: 480, height: 420)
         window.appearance = NSAppearance(named: .darkAqua)
         window.backgroundColor = Self.background
@@ -64,7 +64,7 @@ final class BookWindowController: NSWindowController, NSWindowDelegate, NSToolba
         let content = WKUserContentController()
         content.add(WeakMessageHandler(self), name: "pdbook")
         content.addUserScript(WKUserScript(
-            source: "window.PDBOOK_NATIVE = true;",
+            source: "window.PDBOOK_NATIVE = true; window.PDBOOK_LANG = \(js(appLanguage));",
             injectionTime: .atDocumentStart,
             forMainFrameOnly: true
         ))
@@ -134,7 +134,7 @@ final class BookWindowController: NSWindowController, NSWindowDelegate, NSToolba
         case "library.shown":
             fileURL = nil
             hasDocument = false
-            window?.title = "Library"
+            window?.title = tr("Library", "Bibliothek")
             window?.subtitle = ""
             window?.representedURL = nil
         case "library.open":
@@ -180,10 +180,10 @@ final class BookWindowController: NSWindowController, NSWindowDelegate, NSToolba
     private func confirmRemove(name: String, title: String) {
         guard let url = Library.shared.file(named: name), let window else { return }
         let alert = NSAlert()
-        alert.messageText = "Move “\(title)” to the Trash?"
-        alert.informativeText = "It will be removed from your library. You can restore it from the Trash."
-        alert.addButton(withTitle: "Move to Trash")
-        alert.addButton(withTitle: "Cancel")
+        alert.messageText = tr("Move “\(title)” to the Trash?", "„\(title)“ in den Papierkorb legen?")
+        alert.informativeText = tr("It will be removed from your library. You can restore it from the Trash.", "Es wird aus deiner Bibliothek entfernt. Du kannst es aus dem Papierkorb wiederherstellen.")
+        alert.addButton(withTitle: tr("Move to Trash", "In den Papierkorb legen"))
+        alert.addButton(withTitle: tr("Cancel", "Abbrechen"))
         alert.buttons.first?.hasDestructiveAction = true
         alert.beginSheetModal(for: window) { response in
             guard response == .alertFirstButtonReturn else { return }
@@ -204,7 +204,7 @@ final class BookWindowController: NSWindowController, NSWindowDelegate, NSToolba
             if added.count == 1 {
                 AppDelegate.shared.open(added[0], preferring: self)
             } else {
-                toast("Added \(added.count) books to your library")
+                toast(tr("Added \(added.count) books to your library", "\(added.count) Bücher zur Bibliothek hinzugefügt"))
             }
         } catch {
             NSAlert(error: error).runModal()
@@ -239,7 +239,7 @@ final class BookWindowController: NSWindowController, NSWindowDelegate, NSToolba
             guard let copy = try Library.shared.add([current]).first else { return }
             fileURL = copy
             window?.representedURL = copy
-            toast("Added to your library")
+            toast(tr("Added to your library", "Zur Bibliothek hinzugefügt"))
         } catch {
             NSAlert(error: error).runModal()
         }
@@ -291,35 +291,35 @@ final class BookWindowController: NSWindowController, NSWindowDelegate, NSToolba
         item.isBordered = true
         switch id {
         case Self.openItem:
-            item.label = "Open"
-            item.toolTip = "Open a PDF (⌘O)"
-            item.image = NSImage(systemSymbolName: "folder", accessibilityDescription: "Open")
+            item.label = tr("Open", "Öffnen")
+            item.toolTip = tr("Open a PDF (⌘O)", "Ein PDF öffnen (⌘O)")
+            item.image = NSImage(systemSymbolName: "folder", accessibilityDescription: tr("Open", "Öffnen"))
             item.action = #selector(openFromToolbar(_:))
         case Self.libraryItem:
-            item.label = "Library"
-            item.toolTip = "Back to your library (⌘L)"
-            item.image = NSImage(systemSymbolName: "books.vertical", accessibilityDescription: "Library")
+            item.label = tr("Library", "Bibliothek")
+            item.toolTip = tr("Back to your library (⌘L)", "Zurück zur Bibliothek (⌘L)")
+            item.image = NSImage(systemSymbolName: "books.vertical", accessibilityDescription: tr("Library", "Bibliothek"))
             item.action = #selector(showLibrary(_:))
             item.isNavigational = true
         case Self.addItem:
-            item.label = "Add Books"
-            item.toolTip = "Add PDFs to your library (⇧⌘O)"
+            item.label = tr("Add Books", "Bücher hinzufügen")
+            item.toolTip = tr("Add PDFs to your library (⇧⌘O)", "PDFs zur Bibliothek hinzufügen (⇧⌘O)")
             item.image = NSImage(systemSymbolName: "plus", accessibilityDescription: "Add books")
             item.action = #selector(addBooksFromToolbar(_:))
         case Self.saveItem:
-            item.label = "Add to Library"
-            item.toolTip = "Save this book in your library (⌘D)"
+            item.label = tr("Add to Library", "Zur Bibliothek hinzufügen")
+            item.toolTip = tr("Save this book in your library (⌘D)", "Dieses Buch in der Bibliothek speichern (⌘D)")
             item.image = NSImage(systemSymbolName: "tray.and.arrow.down", accessibilityDescription: "Add to library")
             item.action = #selector(addCurrentToLibrary(_:))
         case Self.prevItem:
-            item.label = "Previous"
-            item.toolTip = "Previous page (←)"
+            item.label = tr("Previous", "Zurück")
+            item.toolTip = tr("Previous page (←)", "Vorherige Seite (←)")
             item.image = NSImage(systemSymbolName: "chevron.left", accessibilityDescription: "Previous page")
             item.action = #selector(previousPage(_:))
             item.isNavigational = true
         case Self.nextItem:
-            item.label = "Next"
-            item.toolTip = "Next page (→)"
+            item.label = tr("Next", "Weiter")
+            item.toolTip = tr("Next page (→)", "Nächste Seite (→)")
             item.image = NSImage(systemSymbolName: "chevron.right", accessibilityDescription: "Next page")
             item.action = #selector(nextPage(_:))
             item.isNavigational = true

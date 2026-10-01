@@ -103,8 +103,8 @@ final class Updater: NSObject, NSMenuItemValidation, URLSessionDownloadDelegate 
         guard !checking, progress == nil else { return }
         guard let feedURL, publicKey != nil else {
             if userInitiated {
-                inform("Updates aren’t set up for this copy of PDBOOK.",
-                       "This build was made without an update feed or signing key.")
+                inform(tr("Updates aren’t set up for this copy of PDBOOK.", "Updates sind für diese PDBOOK-Version nicht eingerichtet."),
+                       tr("This build was made without an update feed or signing key.", "Diese Version wurde ohne Update-Quelle oder Signaturschlüssel erstellt."))
             }
             return
         }
@@ -124,8 +124,8 @@ final class Updater: NSObject, NSMenuItemValidation, URLSessionDownloadDelegate 
               let info = try? JSONDecoder().decode(UpdateInfo.self, from: data) else {
             if userInitiated {
                 let reason = error?.localizedDescription
-                    ?? (status == 404 ? "No release has been published yet." : "The update information couldn’t be read.")
-                inform("Couldn’t check for updates.", reason)
+                    ?? (status == 404 ? tr("No release has been published yet.", "Es wurde noch keine Version veröffentlicht.") : tr("The update information couldn’t be read.", "Die Update-Informationen konnten nicht gelesen werden."))
+                inform(tr("Couldn’t check for updates.", "Nach Updates suchen fehlgeschlagen."), reason)
             }
             return
         }
@@ -133,13 +133,15 @@ final class Updater: NSObject, NSMenuItemValidation, URLSessionDownloadDelegate 
 
         guard Self.isVersion(info.version, newerThan: currentVersion) else {
             if userInitiated {
-                inform("You’re up to date!", "PDBOOK \(currentVersion) is the newest version available.")
+                inform(tr("You’re up to date!", "PDBOOK ist auf dem neuesten Stand!"), tr("PDBOOK \(currentVersion) is the newest version available.",
+                                                         "PDBOOK \(currentVersion) ist die neueste verfügbare Version."))
             }
             return
         }
         if let minimum = info.minimumSystemVersion, !Self.systemSatisfies(minimum) {
             if userInitiated {
-                inform("PDBOOK \(info.version) is available, but it needs macOS \(minimum) or later.", "")
+                inform(tr("PDBOOK \(info.version) is available, but it needs macOS \(minimum) or later.",
+                          "PDBOOK \(info.version) ist verfügbar, benötigt aber macOS \(minimum) oder neuer."), "")
             }
             return
         }
@@ -152,15 +154,16 @@ final class Updater: NSObject, NSMenuItemValidation, URLSessionDownloadDelegate 
     private func ask(_ info: UpdateInfo) {
         let alert = NSAlert()
         alert.icon = NSApp.applicationIconImage
-        alert.messageText = "A new version of PDBOOK is available!"
+        alert.messageText = tr("A new version of PDBOOK is available!", "Eine neue Version von PDBOOK ist verfügbar!")
         alert.informativeText =
-            "PDBOOK \(info.version) is now available — you have \(currentVersion). Would you like to install it now?"
+            tr("PDBOOK \(info.version) is now available — you have \(currentVersion). Would you like to install it now?",
+               "PDBOOK \(info.version) ist jetzt verfügbar – du hast \(currentVersion). Möchtest du das Update jetzt installieren?")
         if let notes = info.notes?.trimmingCharacters(in: .whitespacesAndNewlines), !notes.isEmpty {
             alert.accessoryView = Self.notesView(notes)
         }
-        alert.addButton(withTitle: "Install Update")
-        alert.addButton(withTitle: "Not Now")
-        alert.addButton(withTitle: "Skip This Version")
+        alert.addButton(withTitle: tr("Install Update", "Update installieren"))
+        alert.addButton(withTitle: tr("Not Now", "Später"))
+        alert.addButton(withTitle: tr("Skip This Version", "Diese Version überspringen"))
 
         NSApp.activate(ignoringOtherApps: true)
         switch alert.runModal() {
@@ -181,7 +184,7 @@ final class Updater: NSObject, NSMenuItemValidation, URLSessionDownloadDelegate 
         text.isEditable = false
         text.textContainerInset = NSSize(width: 6, height: 6)
         text.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
-        text.string = "What’s new:\n\n" + notes
+        text.string = tr("What’s new:", "Neuigkeiten:") + "\n\n" + notes
         text.autoresizingMask = [.width]
         scroll.documentView = text
         return scroll
@@ -202,15 +205,16 @@ final class Updater: NSObject, NSMenuItemValidation, URLSessionDownloadDelegate 
     private func install(_ info: UpdateInfo) {
         guard canInstallInPlace else {
             let alert = NSAlert()
-            alert.messageText = "PDBOOK can’t update itself from this location."
-            alert.informativeText = "Move PDBOOK to your Applications folder and try again, or download the new version manually."
-            alert.addButton(withTitle: "Download Manually")
-            alert.addButton(withTitle: "Cancel")
+            alert.messageText = tr("PDBOOK can’t update itself from this location.", "PDBOOK kann sich an diesem Ort nicht selbst aktualisieren.")
+            alert.informativeText = tr("Move PDBOOK to your Applications folder and try again, or download the new version manually.", "Bewege PDBOOK in deinen Programme-Ordner und versuche es erneut, oder lade die neue Version manuell.")
+            alert.addButton(withTitle: tr("Download Manually", "Manuell laden"))
+            alert.addButton(withTitle: tr("Cancel", "Abbrechen"))
             if alert.runModal() == .alertFirstButtonReturn { NSWorkspace.shared.open(info.url) }
             return
         }
         pendingInfo = info
-        let panel = ProgressPanel(title: "Updating PDBOOK", status: "Downloading PDBOOK \(info.version)…")
+        let panel = ProgressPanel(title: tr("Updating PDBOOK", "PDBOOK wird aktualisiert"),
+                                  status: tr("Downloading PDBOOK \(info.version)…", "PDBOOK \(info.version) wird geladen …"))
         panel.onCancel = { [weak self] in self?.cancel() }
         panel.show()
         progress = panel
@@ -239,13 +243,13 @@ final class Updater: NSObject, NSMenuItemValidation, URLSessionDownloadDelegate 
         let dmg = FileManager.default.temporaryDirectory.appendingPathComponent("PDBOOK-update-\(UUID().uuidString).dmg")
         do {
             let status = (downloadTask.response as? HTTPURLResponse)?.statusCode ?? 200
-            guard status == 200 else { throw UpdateError("The download failed (HTTP \(status)).") }
+            guard status == 200 else { throw UpdateError(tr("The download failed (HTTP \(status)).", "Der Download ist fehlgeschlagen (HTTP \(status)).")) }
             try FileManager.default.moveItem(at: location, to: dmg)
         } catch {
             return fail(error)
         }
         guard let info = pendingInfo, let key = publicKey else { return }
-        progress?.setStatus("Verifying…")
+        progress?.setStatus(tr("Verifying…", "Wird überprüft …"))
         progress?.setProgress(nil)
         let target = appURL
         DispatchQueue.global(qos: .userInitiated).async {
@@ -270,7 +274,7 @@ final class Updater: NSObject, NSMenuItemValidation, URLSessionDownloadDelegate 
         let data = try Data(contentsOf: dmg, options: .mappedIfSafe)
         guard let signature = Data(base64Encoded: info.signature),
               key.isValidSignature(signature, for: data) else {
-            throw UpdateError("The update’s signature is invalid, so it wasn’t installed.")
+            throw UpdateError(tr("The update’s signature is invalid, so it wasn’t installed.", "Die Signatur des Updates ist ungültig, daher wurde es nicht installiert."))
         }
 
         let mount = try attach(dmg)
@@ -279,13 +283,13 @@ final class Updater: NSObject, NSMenuItemValidation, URLSessionDownloadDelegate 
         let contents = try FileManager.default.contentsOfDirectory(at: mount, includingPropertiesForKeys: nil)
         guard let newApp = contents.first(where: { $0.pathExtension == "app" }),
               let bundle = Bundle(url: newApp) else {
-            throw UpdateError("The update doesn’t contain an app.")
+            throw UpdateError(tr("The update doesn’t contain an app.", "Das Update enthält keine App."))
         }
         guard bundle.bundleIdentifier == Bundle.main.bundleIdentifier else {
-            throw UpdateError("The update is for a different app.")
+            throw UpdateError(tr("The update is for a different app.", "Das Update gehört zu einer anderen App."))
         }
         guard (bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String) == info.version else {
-            throw UpdateError("The update’s version doesn’t match what was announced.")
+            throw UpdateError(tr("The update’s version doesn’t match what was announced.", "Die Version des Updates stimmt nicht mit der angekündigten überein."))
         }
 
         let staging = try FileManager.default.url(for: .itemReplacementDirectory, in: .userDomainMask,
@@ -297,7 +301,7 @@ final class Updater: NSObject, NSMenuItemValidation, URLSessionDownloadDelegate 
     }
 
     private func finish(staged: URL) {
-        progress?.setStatus("Installing…")
+        progress?.setStatus(tr("Installing…", "Wird installiert …"))
         do {
             _ = try FileManager.default.replaceItemAt(appURL, withItemAt: staged)
             try? FileManager.default.removeItem(at: staged.deletingLastPathComponent())
@@ -321,10 +325,10 @@ final class Updater: NSObject, NSMenuItemValidation, URLSessionDownloadDelegate 
         cancel()
         let alert = NSAlert()
         alert.alertStyle = .warning
-        alert.messageText = "The update couldn’t be installed."
+        alert.messageText = tr("The update couldn’t be installed.", "Das Update konnte nicht installiert werden.")
         alert.informativeText = (error as? UpdateError)?.message ?? error.localizedDescription
-        alert.addButton(withTitle: "OK")
-        if info != nil { alert.addButton(withTitle: "Download Manually") }
+        alert.addButton(withTitle: tr("OK", "OK"))
+        if info != nil { alert.addButton(withTitle: tr("Download Manually", "Manuell laden")) }
         if alert.runModal() == .alertSecondButtonReturn, let info { NSWorkspace.shared.open(info.url) }
     }
 
@@ -421,7 +425,7 @@ private final class ProgressPanel {
         bar.startAnimation(nil)
         view.addSubview(bar)
 
-        let cancel = NSButton(title: "Cancel", target: nil, action: nil)
+        let cancel = NSButton(title: tr("Cancel", "Abbrechen"), target: nil, action: nil)
         cancel.frame = NSRect(x: 270, y: 12, width: 96, height: 28)
         cancel.bezelStyle = .rounded
         cancel.keyEquivalent = "\u{1b}"

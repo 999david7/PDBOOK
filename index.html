@@ -15,13 +15,13 @@
       </div>
       <div class="doc-title" id="docTitle"></div>
       <div class="actions">
-        <button class="icon-btn" id="libraryBtn" title="Library" aria-label="Back to library" hidden>
+        <button class="icon-btn" id="libraryBtn" data-i18n-title="library" data-i18n-aria="backToLibrary" hidden>
           <svg viewBox="0 0 24 24"><path d="M5 4v16M9 4v16M13 5l4 15M19 20H4" /></svg>
         </button>
-        <button class="icon-btn" id="openBtn" title="Open PDF (O)" aria-label="Open PDF">
+        <button class="icon-btn" id="openBtn" data-i18n-title="openPdf" data-i18n-aria="openPdfLabel">
           <svg viewBox="0 0 24 24"><path d="M4 20V6a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v2" /><path d="M4 20l3-8h15l-3 8z" /></svg>
         </button>
-        <button class="icon-btn" id="fsBtn" title="Fullscreen (F)" aria-label="Toggle fullscreen">
+        <button class="icon-btn" id="fsBtn" data-i18n-title="fullscreen" data-i18n-aria="fullscreenLabel">
           <svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg>
         </button>
       </div>
@@ -32,17 +32,17 @@
         <div class="lib-inner">
           <header class="lib-head">
             <div>
-              <h1>Library</h1>
+              <h1 data-i18n="library">Library</h1>
               <p class="lib-sub">
                 <span id="libCount"></span>
-                <span class="native-only"> · <button class="link" id="libLocation" title="Change library location…"></button></span>
+                <span class="native-only"> · <button class="link" id="libLocation" data-i18n-title="changeLocation"></button></span>
               </p>
             </div>
             <div class="lib-actions">
-              <button class="ghost native-only" id="libReveal">Show in Finder</button>
+              <button class="ghost native-only" id="libReveal" data-i18n="showInFinder">Show in Finder</button>
               <button class="primary" id="libAdd">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
-                Add Books
+                <span data-i18n="addBooks">Add Books</span>
               </button>
             </div>
           </header>
@@ -51,9 +51,9 @@
             <div class="drop-art" aria-hidden="true">
               <div class="mini-book"><span></span><span></span><span></span></div>
             </div>
-            <h2>Choose where to keep your books</h2>
-            <p>PDBOOK creates a “PDBOOK Library” folder there, with five free sample books to get you started.</p>
-            <button class="primary" id="libChoose">Choose Library Folder…</button>
+            <h2 data-i18n="setupTitle">Choose where to keep your books</h2>
+            <p data-i18n="setupText"></p>
+            <button class="primary" id="libChoose" data-i18n="setupButton">Choose Library Folder…</button>
           </div>
 
           <div class="shelf" id="shelf"></div>
@@ -62,9 +62,9 @@
             <div class="drop-art" aria-hidden="true">
               <div class="mini-book"><span></span><span></span><span></span></div>
             </div>
-            <h2>Your library is empty</h2>
-            <p>Add PDFs with <strong>Add Books</strong>, or drop them onto this window.</p>
-            <button class="link native-only" id="libRestore">Restore the free sample books</button>
+            <h2 data-i18n="emptyTitle">Your library is empty</h2>
+            <p data-i18n-html="emptyText"></p>
+            <button class="link native-only" id="libRestore" data-i18n="restoreSamples">Restore the free sample books</button>
           </div>
 
           <p class="lib-note web-only" id="libNote"></p>
@@ -78,25 +78,25 @@
         </div>
       </div>
 
-      <button class="nav-arrow prev" id="prevBtn" aria-label="Previous page" hidden>
+      <button class="nav-arrow prev" id="prevBtn" data-i18n-aria="previousPage" hidden>
         <svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" /></svg>
       </button>
-      <button class="nav-arrow next" id="nextBtn" aria-label="Next page" hidden>
+      <button class="nav-arrow next" id="nextBtn" data-i18n-aria="nextPage" hidden>
         <svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" /></svg>
       </button>
 
       <div id="loading" hidden>
         <div class="loader"><span></span><span></span><span></span></div>
-        <p id="loadingText">Opening…</p>
+        <p id="loadingText"></p>
       </div>
     </main>
 
     <footer class="bottombar" id="bottombar" hidden>
-      <input type="range" id="scrubber" min="0" max="0" value="0" aria-label="Page" />
+      <input type="range" id="scrubber" min="0" max="0" value="0" data-i18n-aria="page" />
       <div class="indicator" id="indicator"></div>
     </footer>
 
-    <div id="dropOverlay" hidden><div>Drop PDF to open</div></div>
+    <div id="dropOverlay" hidden><div data-i18n="dropToOpen"></div></div>
     <div id="toast" role="status" aria-live="polite"></div>
     <input type="file" id="fileInput" accept="application/pdf,.pdf" hidden />
 

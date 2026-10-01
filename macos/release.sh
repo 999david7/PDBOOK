@@ -4,10 +4,14 @@
 #   npm run release -- <version> ["release notes" | notes-file.md] [--yes]
 #
 # 1. sets the version in package.json
-# 2. builds the app + .dmg (macos/build.sh)
-# 3. signs the .dmg with your private update key
-# 4. writes update.json (the feed the app checks)
-# 5. creates a GitHub release with both files, after asking you to confirm
+# 2. builds the English and German apps + PDBOOK-en.dmg / PDBOOK-de.dmg
+# 3. signs both .dmg files with your private update key
+# 4. writes update-en.json / update-de.json (the feeds each build checks)
+#    plus update.json for installs from before the language split
+# 5. creates a GitHub release with all files, after asking you to confirm
+#
+# Release notes apply to both languages; separate them with a line containing
+# only "---" to give German its own notes: "English notes\n---\nDeutsch".
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -51,28 +55,36 @@ npm version "$VERSION" --no-git-tag-version --allow-same-version >/dev/null
 
 bash macos/build.sh
 
-DMG="build/macos/PDBOOK-$VERSION.dmg"
-FEED="build/macos/update.json"
-
-step "Signing update"
-SIGNATURE="$(xcrun swift macos/update-tool.swift sign "$DMG")"
-xcrun swift macos/update-tool.swift verify "$DMG" "$SIGNATURE"
-
-URL="https://github.com/$REPO/releases/download/v$VERSION/PDBOOK-$VERSION.dmg"
-VERSION="$VERSION" URL="$URL" SIGNATURE="$SIGNATURE" NOTES="$NOTES" DMG="$DMG" FEED="$FEED" node -e '
-  const fs = require("fs");
-  const e = process.env;
-  fs.writeFileSync(e.FEED, JSON.stringify({
-    version: e.VERSION,
-    notes: e.NOTES,
-    pubDate: new Date().toISOString(),
-    url: e.URL,
-    size: fs.statSync(e.DMG).size,
-    signature: e.SIGNATURE,
-    minimumSystemVersion: "13.0",
-  }, null, 2) + "\n");
-'
-cat "$FEED"
+step "Signing updates"
+ASSETS=()
+for LANG_CODE in en de; do
+  DMG="build/macos/PDBOOK-$LANG_CODE.dmg"
+  FEED="build/macos/update-$LANG_CODE.json"
+  SIGNATURE="$(xcrun swift macos/update-tool.swift sign "$DMG")"
+  xcrun swift macos/update-tool.swift verify "$DMG" "$SIGNATURE"
+  URL="https://github.com/$REPO/releases/download/v$VERSION/PDBOOK-$LANG_CODE.dmg"
+  LANG_CODE="$LANG_CODE" VERSION="$VERSION" URL="$URL" SIGNATURE="$SIGNATURE" NOTES="$NOTES" DMG="$DMG" FEED="$FEED" node -e '
+    const fs = require("fs");
+    const e = process.env;
+    const parts = e.NOTES.split(/^---$/m).map((p) => p.trim());
+    const notes = e.LANG_CODE === "de" && parts[1] ? parts[1] : parts[0];
+    fs.writeFileSync(e.FEED, JSON.stringify({
+      version: e.VERSION,
+      notes,
+      pubDate: new Date().toISOString(),
+      url: e.URL,
+      size: fs.statSync(e.DMG).size,
+      signature: e.SIGNATURE,
+      minimumSystemVersion: "13.0",
+    }, null, 2) + "\n");
+  '
+  ASSETS+=("$DMG" "$FEED")
+done
+# Installs from before the language split (≤ 1.1.1) read update.json; they
+# are English, so they get the English feed and become English builds.
+cp build/macos/update-en.json build/macos/update.json
+ASSETS+=(build/macos/update.json)
+cat build/macos/update-de.json
 
 # --- publish ---------------------------------------------------------------
 step "Ready to publish PDBOOK $VERSION to github.com/$REPO"
@@ -81,7 +93,7 @@ if ! $ASSUME_YES; then
   [[ "$ok" =~ ^[Yy]$ ]] || { echo "Not published. Files are in build/macos/."; exit 0; }
 fi
 
-gh release create "v$VERSION" "$DMG" "$FEED" \
+gh release create "v$VERSION" "${ASSETS[@]}" \
   --repo "$REPO" --title "PDBOOK $VERSION" --notes "$NOTES" --latest
 
 step "Published"

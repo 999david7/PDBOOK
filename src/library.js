@@ -8,6 +8,7 @@ import { openPdf, readTitle, renderLogicalPage, closePdf } from './pdf.js';
 import { findFrontCover } from './layout.js';
 import { makeCover } from './covers.js';
 import { native } from './native.js';
+import { t, lang } from './i18n.js';
 
 const BASE = import.meta.env.BASE_URL;
 const THUMB_WIDTH = 320;
@@ -67,22 +68,20 @@ export function createLibrary({ root, onOpen, onAddInBrowser }) {
   async function loadBrowserShelf() {
     let list = [];
     try {
-      list = await (await fetch(`${BASE}samples/index.json`)).json();
+      list = await (await fetch(`${BASE}samples/${lang}/index.json`)).json();
     } catch {
       // No samples available.
     }
     const hidden = new Set(readJSON(HIDDEN_KEY, []));
     books = list
       .filter((b) => !hidden.has(b.file))
-      .map((b) => ({ name: b.file, title: b.title, author: b.author, url: `${BASE}samples/${b.file}`, size: 0, mtime: 0 }));
+      .map((b) => ({ name: b.file, title: b.title, author: b.author, url: `${BASE}samples/${lang}/${b.file}`, size: 0, mtime: 0 }));
     const removed = list.filter((b) => hidden.has(b.file)).length;
-    els.note.replaceChildren(
-      'In the browser your shelf holds the free sample books. Get the Mac app to keep your own books in a library folder.',
-    );
+    els.note.replaceChildren(t('browserNote'));
     if (removed) {
       const restore = document.createElement('button');
       restore.className = 'link';
-      restore.textContent = `Restore ${removed} removed sample${removed > 1 ? 's' : ''}`;
+      restore.textContent = t('restoreRemoved', { n: removed });
       restore.addEventListener('click', () => {
         writeJSON(HIDDEN_KEY, []);
         loadBrowserShelf();
@@ -96,7 +95,9 @@ export function createLibrary({ root, onOpen, onAddInBrowser }) {
   function update(payload) {
     configured = Boolean(payload.configured);
     books = (payload.books || []).map((b) => ({ ...b, url: `${BASE}${b.url.replace(/^\//, '')}` }));
-    els.location.textContent = payload.location || '';
+    // LRM marks keep the slashes in place: the element truncates right-to-left
+    // so the folder name stays visible.
+    els.location.textContent = payload.location ? `\u200E${payload.location}\u200E` : '';
     render();
   }
 
@@ -106,7 +107,7 @@ export function createLibrary({ root, onOpen, onAddInBrowser }) {
     els.setup.hidden = configured;
     els.reveal.hidden = !configured;
     els.location.parentElement.hidden = !configured || !els.location.textContent;
-    els.count.textContent = configured ? `${books.length} book${books.length === 1 ? '' : 's'}` : '';
+    els.count.textContent = configured ? t('bookCount', { n: books.length }) : '';
     els.empty.hidden = !configured || books.length > 0;
     els.shelf.hidden = !configured || books.length === 0;
     els.shelf.replaceChildren(...books.map(card));
@@ -134,14 +135,14 @@ export function createLibrary({ root, onOpen, onAddInBrowser }) {
     remove.className = 'book-remove';
     remove.innerHTML =
       '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg>';
-    const verb = native.active ? 'Move to Trash' : 'Remove from shelf';
+    const verb = native.active ? t('moveToTrash') : t('removeFromShelf');
     remove.title = verb;
 
     el.append(wrap, title, remove);
     const label = () => thumbs.get(key)?.title || book.title || titleFromName(book.name);
     const setText = () => {
       title.textContent = label();
-      el.setAttribute('aria-label', `Open ${label()}`);
+      el.setAttribute('aria-label', t('openBook', { title: label() }));
       remove.setAttribute('aria-label', `${verb}: ${label()}`);
     };
     setText();
@@ -195,7 +196,7 @@ export function createLibrary({ root, onOpen, onAddInBrowser }) {
       native.post('library.remove', { name: book.name, title });
       return;
     }
-    if (!confirm(`Remove “${title}” from your shelf?`)) return;
+    if (!confirm(t('confirmRemove', { title }))) return;
     const hidden = new Set(readJSON(HIDDEN_KEY, []));
     hidden.add(book.name);
     writeJSON(HIDDEN_KEY, [...hidden]);

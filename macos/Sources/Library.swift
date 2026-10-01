@@ -7,7 +7,7 @@ import AppKit
 final class Library {
     static let shared = Library()
     static let didChange = Notification.Name("PDBOOKLibraryDidChange")
-    static let folderName = "PDBOOK Library"
+    static let folderName = tr("PDBOOK Library", "PDBOOK Bibliothek")
 
     private enum Keys {
         static let path = "LibraryPath"
@@ -144,7 +144,7 @@ final class Library {
     @discardableResult
     func installSamples() -> Int {
         guard let folder,
-              let samples = Bundle.main.resourceURL?.appendingPathComponent("web/samples", isDirectory: true)
+              let samples = Bundle.main.resourceURL?.appendingPathComponent("web/samples/\(appLanguage)", isDirectory: true)
         else { return 0 }
         var count = 0
         for file in pdfs(in: samples) {

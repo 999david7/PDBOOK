@@ -1,5 +1,6 @@
 import * as pdfjs from 'pdfjs-dist';
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+import { t } from './i18n.js';
 
 pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
 
@@ -35,7 +36,7 @@ export async function readTitle(pdf, fileName) {
       .replace(/\s+/g, ' ')
       .trim();
   }
-  return { title: title || 'Untitled', author };
+  return { title: title || t('untitled'), author };
 }
 
 /** Size (in PDF points) of every page, respecting /Rotate. */

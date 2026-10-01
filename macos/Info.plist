@@ -3,7 +3,13 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleDevelopmentRegion</key>
-	<string>en</string>
+	<string>__LANG__</string>
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>__LANG__</string>
+	</array>
+	<key>PDBookLanguage</key>
+	<string>__LANG__</string>
 	<key>CFBundleDisplayName</key>
 	<string>PDBOOK</string>
 	<key>CFBundleName</key>

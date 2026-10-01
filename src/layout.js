@@ -2,6 +2,7 @@
 // and back covers, drops blank leading/trailing pages and pads the interior
 // so every spread is complete.
 import { readPageSizes, renderLogicalPage, countTextChars } from './pdf.js';
+import { t } from './i18n.js';
 
 const COVER_THRESHOLD = 0.7;
 const SCAN_FRONT = 4; // how many leading pages to inspect for a cover
@@ -118,11 +119,11 @@ export async function findFrontCover(pdf) {
  * The first page is always the front cover and the last the back cover.
  */
 export async function buildBook(pdf, onProgress = () => {}) {
-  onProgress('Measuring pages…');
+  onProgress(t('measuring'));
   const sizes = await readPageSizes(pdf);
   let { pages, spreads } = buildLogicalPages(sizes);
 
-  onProgress('Looking for the cover…');
+  onProgress(t('findingCover'));
   const cache = new Map();
   const stats = async (i) => {
     if (!cache.has(i)) cache.set(i, await analyze(pdf, pages[i]));

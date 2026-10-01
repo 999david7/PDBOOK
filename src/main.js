@@ -5,7 +5,10 @@ import { PageTurner, FORWARD, BACK } from './turner.js';
 import { native } from './native.js';
 import { makeCover, makeBackCover } from './covers.js';
 import { createLibrary } from './library.js';
+import { t, translateDocument } from './i18n.js';
 import './style.css';
+
+translateDocument();
 
 const $ = (id) => document.getElementById(id);
 const els = {
@@ -52,7 +55,7 @@ const state = {
 
 async function loadDocument(source) {
   const loadId = ++state.loadId;
-  setLoading('Opening…');
+  setLoading(t('opening'));
   try {
     const data = source.file
       ? new Uint8Array(await source.file.arrayBuffer())
@@ -90,19 +93,14 @@ async function loadDocument(source) {
   } catch (err) {
     console.error(err);
     setLoading(null);
-    toast(`Couldn't open that file: ${err?.message || err}`, 5000);
+    toast(t('openFailed', { error: err?.message || err }), 5000);
   }
 }
 
 function announceLayout(book) {
-  const notes = [];
-  if (book.frontCover) {
-    notes.push(`Cover found on page ${book.frontCover.pdfIndex + 1}`);
-  } else {
-    notes.push('No cover in the PDF — made one from the title');
-  }
-  if (book.spreads) notes.push('two-page spreads split');
-  if (book.skipped) notes.push(`${book.skipped} blank page${book.skipped > 1 ? 's' : ''} skipped`);
+  const notes = [book.frontCover ? t('coverFound', { page: book.frontCover.pdfIndex + 1 }) : t('coverMade')];
+  if (book.spreads) notes.push(t('spreadsSplit'));
+  if (book.skipped) notes.push(t('blanksSkipped', { n: book.skipped }));
   toast(notes.join(' · '), 3800);
 }
 
@@ -300,8 +298,8 @@ function onPageChange(animate) {
 
 function label(i) {
   const p = state.book.pages[i];
-  if (i === 0) return 'Cover';
-  if (i === state.book.pages.length - 1) return 'Back cover';
+  if (i === 0) return t('cover');
+  if (i === state.book.pages.length - 1) return t('backCover');
   if (p.kind === 'blank') return '';
   return String(p.pdfIndex + 1) + (p.half === 'left' ? 'a' : p.half === 'right' ? 'b' : '');
 }
@@ -511,7 +509,7 @@ window.addEventListener('drop', (e) => {
     (f) => f.type === 'application/pdf' || /\.pdf$/i.test(f.name),
   );
   if (file) loadDocument({ file });
-  else toast('That doesn’t look like a PDF.');
+  else toast(t('notPdf'));
 });
 
 function toggleFullscreen() {
@@ -591,7 +589,7 @@ window.pdbook = {
   showLibrary,
   toast: (text) => toast(text),
   dragOverlay: (on) => {
-    els.dropOverlay.firstElementChild.textContent = 'Drop to add to your library';
+    els.dropOverlay.firstElementChild.textContent = t('dropToAdd');
     els.dropOverlay.hidden = !on;
   },
   next,
