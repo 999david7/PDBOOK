@@ -2,26 +2,31 @@
   {
     "file": "01-the-cartographer-of-small-islands.pdf",
     "title": "The Cartographer of Small Islands",
-    "author": "PDBOOK Sample Press"
+    "author": "PDBOOK Sample Press",
+    "size": 15621
   },
   {
     "file": "02-the-clockmakers-fox.pdf",
     "title": "The Clockmaker’s Fox",
-    "author": "PDBOOK Sample Press"
+    "author": "PDBOOK Sample Press",
+    "size": 21050
   },
   {
     "file": "03-a-field-guide-to-imaginary-birds.pdf",
     "title": "A Field Guide to Imaginary Birds",
-    "author": "PDBOOK Sample Press"
+    "author": "PDBOOK Sample Press",
+    "size": 21772
   },
   {
     "file": "04-bread-and-salt.pdf",
     "title": "Bread & Salt: Simple Recipes",
-    "author": "PDBOOK Sample Press"
+    "author": "PDBOOK Sample Press",
+    "size": 14736
   },
   {
     "file": "05-small-hours.pdf",
     "title": "Small Hours: Twelve Short Poems",
-    "author": "PDBOOK Sample Press"
+    "author": "PDBOOK Sample Press",
+    "size": 13877
   }
 ]

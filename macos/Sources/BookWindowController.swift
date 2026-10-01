@@ -17,7 +17,8 @@ final class BookWindowController: NSWindowController, NSWindowDelegate, NSToolba
     /// True while the window shows the library rather than a book.
     var isEmpty: Bool { fileURL == nil && !hasDocument }
 
-    private static let background = NSColor(srgbRed: 0.106, green: 0.094, blue: 0.082, alpha: 1)
+    /// Matches the top of the page's sky gradient (--sky-top) so the title bar blends in.
+    private static let background = NSColor(srgbRed: 0.804, green: 0.933, blue: 1.0, alpha: 1)
     private static let positionsKey = "lastPagePerFile"
 
     init() {
@@ -32,7 +33,7 @@ final class BookWindowController: NSWindowController, NSWindowDelegate, NSToolba
         )
         window.title = tr("Library", "Bibliothek")
         window.minSize = NSSize(width: 480, height: 420)
-        window.appearance = NSAppearance(named: .darkAqua)
+        window.appearance = NSAppearance(named: .aqua)
         window.backgroundColor = Self.background
         window.titlebarAppearsTransparent = true
         window.toolbarStyle = .unified

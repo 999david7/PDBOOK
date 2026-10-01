@@ -75,7 +75,7 @@ export function createLibrary({ root, onOpen, onAddInBrowser }) {
     const hidden = new Set(readJSON(HIDDEN_KEY, []));
     books = list
       .filter((b) => !hidden.has(b.file))
-      .map((b) => ({ name: b.file, title: b.title, author: b.author, url: `${BASE}samples/${lang}/${b.file}`, size: 0, mtime: 0 }));
+      .map((b) => ({ name: b.file, title: b.title, author: b.author, url: `${BASE}samples/${lang}/${b.file}`, size: b.size || 0, mtime: 0 }));
     const removed = list.filter((b) => hidden.has(b.file)).length;
     els.note.replaceChildren(t('browserNote'));
     if (removed) {

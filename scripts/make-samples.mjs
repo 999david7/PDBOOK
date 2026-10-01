@@ -2,7 +2,7 @@
 // index.json per language). Original works written for PDBOOK; the text
 // lives in sample-text.mjs. Run with `npm run samples`.
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
-import { writeFileSync, mkdirSync, rmSync } from 'node:fs';
+import { writeFileSync, mkdirSync, rmSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { TEXT } from './sample-text.mjs';
@@ -104,7 +104,7 @@ async function cartographer(T) {
     height: 612,
   });
   const { f, W, H } = b;
-  const navy = hex(0x172942);
+  const navy = hex(0x2a6fd6); // bright sea blue
   const gold = hex(0xdbae54);
 
   const cover = b.page(navy);
@@ -183,7 +183,7 @@ async function clockmakersFox(T) {
     p.drawLine({ start: { x: cx, y: cy }, end: { x: cx, y: cy + r * 0.68 }, thickness: r / 20, color: dark });
   }
 
-  const cover = b.page(hex(0x203a4c));
+  const cover = b.page(hex(0x4b52c9));
   for (let i = 0; i < 40; i++) {
     cover.drawCircle({ x: (i * 97) % W, y: 300 + ((i * 61) % 230), size: 1.4, color: cream, opacity: 0.7 });
   }
@@ -208,7 +208,7 @@ async function clockmakersFox(T) {
   fox(end, W / 2, 200, 0.8);
   b.folio(end);
 
-  const back = b.page(hex(0x203a4c));
+  const back = b.page(hex(0x4b52c9));
   clock(back, W / 2, 300, 60, 6);
   b.centered(back, C.back, f.italic, 16, 180, cream);
   await b.save(C.file);
@@ -222,7 +222,7 @@ async function fieldGuide(T) {
   const C = T.birds;
   const b = await makeBook({ title: C.title, author: T.publisher, width: 360, height: 576 });
   const { f, W, H } = b;
-  const green = hex(0x2f4a3a);
+  const green = hex(0x2e9d62);
   const sand = hex(0xe9dfc8);
 
   function bird(p, cx, cy, s, body, wing, beak = hex(0xe0a030), crest = false) {
@@ -289,7 +289,7 @@ async function breadAndSalt(T) {
   const C = T.bread;
   const b = await makeBook({ title: C.title, author: T.publisher, width: 420, height: 595 });
   const { f, W, H } = b;
-  const red = hex(0xa8382c);
+  const red = hex(0xe5533d);
   const cream = hex(0xf6ead2);
 
   const cover = b.page(red);
@@ -354,7 +354,7 @@ async function smallHours(T) {
   const C = T.poems;
   const b = await makeBook({ title: C.title, author: T.publisher, width: 360, height: 576 });
   const { f, W, H } = b;
-  const plum = hex(0x2c2140);
+  const plum = hex(0x5a3fc0);
   const moon = hex(0xf2e6c4);
 
   const cover = b.page(plum);
@@ -394,7 +394,11 @@ for (const lang of Object.keys(TEXT)) {
   LANG = lang;
   mkdirSync(join(outDir, lang), { recursive: true });
   const books = [];
-  for (const make of [cartographer, clockmakersFox, fieldGuide, breadAndSalt, smallHours]) books.push(await make(TEXT[lang]));
+  for (const make of [cartographer, clockmakersFox, fieldGuide, breadAndSalt, smallHours]) {
+    const book = await make(TEXT[lang]);
+    // The size lets the shelf notice when a sample changes (thumbnail cache key).
+    books.push({ ...book, size: statSync(join(outDir, lang, book.file)).size });
+  }
   writeFileSync(join(outDir, lang, 'index.json'), JSON.stringify(books, null, 2) + '\n');
   console.log(`Wrote ${books.length} ${lang} sample books to public/samples/${lang}/`);
 }

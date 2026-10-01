@@ -1,6 +1,6 @@
 # PDBOOK
 
-Open any PDF as a book with realistic page-folding animations.
+Open any PDF as a book with realistic page-folding animations. PDBOOK is made for young readers and classrooms. It has a bright, friendly design with rounded fonts, big buttons that are easy to hit, and a bookshelf for your books. The fonts are bundled, so it also works offline.
 
 - **Page curl that follows you**: grab a page anywhere and the page follows the pointer smoothly. Flick it to turn, or let go early and it settles back. Two-finger trackpad swipes curl the page live. Clicks, the arrows and ← / → turn the page along an eased arc. Home/End, Space and PageUp/PageDown also work.
 - **Auto-fit**: the book resizes to the window. It shows two pages side by side when that fits, and a single page on narrow or portrait screens.

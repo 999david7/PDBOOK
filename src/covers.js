@@ -1,10 +1,12 @@
-// Cloth-bound covers generated for PDFs that don't have a cover of their own.
+// Colourful covers generated for PDFs that don't have a cover of their own.
+// Bright, friendly colours: [cover, lettering]
 const CLOTH = [
-  ['#1f3a5f', '#d9b36a'],
-  ['#5a1f2b', '#e0c27a'],
-  ['#20463a', '#d8bf7c'],
-  ['#2d2a4a', '#c9b37e'],
-  ['#3b2f25', '#d6ae62'],
+  ['#ff6b6b', '#fffaf0'],
+  ['#4aa8ff', '#fffbe6'],
+  ['#1fb5a8', '#fff8dc'],
+  ['#8c6cf2', '#fff3c4'],
+  ['#ff9f43', '#fffdf5'],
+  ['#5cbf4a', '#fffef2'],
 ];
 
 function clothFor(title) {
@@ -16,7 +18,7 @@ function clothFor(title) {
 function ornament() {
   const orn = document.createElement('div');
   orn.className = 'gen-ornament';
-  orn.textContent = '❦';
+  orn.textContent = '★';
   return orn;
 }
 

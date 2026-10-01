@@ -6,6 +6,10 @@ import { native } from './native.js';
 import { makeCover, makeBackCover } from './covers.js';
 import { createLibrary } from './library.js';
 import { t, translateDocument } from './i18n.js';
+import '@fontsource/fredoka/600.css';
+import '@fontsource/fredoka/700.css';
+import '@fontsource/nunito/600.css';
+import '@fontsource/nunito/700.css';
 import './style.css';
 
 translateDocument();
@@ -290,6 +294,7 @@ function onPageChange(animate) {
   els.prev.disabled = idx <= 0;
   els.next.disabled = visibleIndexes(idx).at(-1) >= n - 1;
   els.scrubber.value = String(idx);
+  updateProgressFill();
   els.indicator.textContent = describe(visibleIndexes(idx));
   native.post('page', { label: els.indicator.textContent.replace(/\s+/g, ' '), index: idx });
   writeStore(state.posKey, idx);
@@ -410,7 +415,13 @@ function goTo(index) {
 els.next.addEventListener('click', next);
 els.prev.addEventListener('click', prev);
 
+function updateProgressFill() {
+  const max = Number(els.scrubber.max) || 1;
+  els.scrubber.style.setProperty('--progress', `${(Number(els.scrubber.value) / max) * 100}%`);
+}
+
 els.scrubber.addEventListener('input', () => {
+  updateProgressFill();
   els.indicator.textContent = describe(visibleIndexes(Number(els.scrubber.value)));
 });
 els.scrubber.addEventListener('change', () => {
