@@ -131,6 +131,21 @@ final class Library {
         return result
     }
 
+    /// Writes a new book (one made from pictures) into the library, or into a
+    /// temporary folder while there is no library yet. Returns its location.
+    func save(_ data: Data, title: String) throws -> URL {
+        var name = title.components(separatedBy: CharacterSet(charactersIn: "/:\\"))
+            .joined(separator: "-")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        while name.hasPrefix(".") { name.removeFirst() }
+        if name.isEmpty { name = tr("Picture Book", "Bilderbuch") }
+        let dir = folder ?? fm.temporaryDirectory
+        let target = uniqueDestination(for: String(name.prefix(120)) + ".pdf", in: dir)
+        try data.write(to: target, options: .atomic)
+        notify()
+        return target
+    }
+
     func moveToTrash(_ url: URL, completion: @escaping (Error?) -> Void) {
         NSWorkspace.shared.recycle([url]) { _, error in
             DispatchQueue.main.async {

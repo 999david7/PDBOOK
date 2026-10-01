@@ -6,6 +6,8 @@ import { native } from './native.js';
 import { makeCover, makeBackCover } from './covers.js';
 import { createLibrary } from './library.js';
 import { t, translateDocument } from './i18n.js';
+import { isPicture, sortPictures, guessTitle, readTakenTime, makePictureBook } from './pictures.js';
+import { arrange, isArranging } from './arrange.js';
 import '@fontsource/fredoka/600.css';
 import '@fontsource/fredoka/700.css';
 import '@fontsource/nunito/600.css';
@@ -32,6 +34,7 @@ const els = {
   indicator: $('indicator'),
   docTitle: $('docTitle'),
   fileInput: $('fileInput'),
+  pictureInput: $('pictureInput'),
   dropOverlay: $('dropOverlay'),
   toast: $('toast'),
 };
@@ -61,9 +64,11 @@ async function loadDocument(source) {
   const loadId = ++state.loadId;
   setLoading(t('opening'));
   try {
-    const data = source.file
-      ? new Uint8Array(await source.file.arrayBuffer())
-      : new Uint8Array(await (await fetch(source.url)).arrayBuffer());
+    const data = source.data
+      ? source.data
+      : source.file
+        ? new Uint8Array(await source.file.arrayBuffer())
+        : new Uint8Array(await (await fetch(source.url)).arrayBuffer());
     const name =
       source.file?.name || source.name || decodeURIComponent(source.url.split('/').pop() || 'document.pdf');
 
@@ -437,6 +442,7 @@ els.scrubber.addEventListener('change', () => {
 });
 
 document.addEventListener('keydown', (e) => {
+  if (isArranging()) return;
   if (e.target instanceof HTMLInputElement && e.target.type !== 'range') return;
   if (e.metaKey || e.ctrlKey || e.altKey) return;
   const k = e.key;
@@ -498,7 +504,7 @@ els.fileInput.addEventListener('change', () => {
 let dragDepth = 0;
 const hasFiles = (e) => [...(e.dataTransfer?.types || [])].includes('Files');
 window.addEventListener('dragenter', (e) => {
-  if (!hasFiles(e)) return;
+  if (!hasFiles(e) || isArranging()) return;
   e.preventDefault();
   dragDepth++;
   els.dropOverlay.hidden = false;
@@ -516,10 +522,12 @@ window.addEventListener('drop', (e) => {
   e.preventDefault();
   dragDepth = 0;
   els.dropOverlay.hidden = true;
-  const file = [...(e.dataTransfer?.files || [])].find(
-    (f) => f.type === 'application/pdf' || /\.pdf$/i.test(f.name),
-  );
+  if (isArranging()) return;
+  const files = [...(e.dataTransfer?.files || [])];
+  const file = files.find((f) => f.type === 'application/pdf' || /\.pdf$/i.test(f.name));
+  const pictures = files.filter(isPicture);
   if (file) loadDocument({ file });
+  else if (pictures.length) picturesFromFiles(pictures);
   else toast(t('notPdf'));
 });
 
@@ -527,6 +535,73 @@ function toggleFullscreen() {
   if (native.active) native.post('fullscreen');
   else if (document.fullscreenElement) document.exitFullscreen();
   else document.documentElement.requestFullscreen?.().catch(() => {});
+}
+
+/* ------------------------------------------------------------------------ */
+/* Book from pictures                                                       */
+/* ------------------------------------------------------------------------ */
+
+function pickPictures() {
+  if (native.active) native.post('pictures.pick');
+  else els.pictureInput.click();
+}
+
+els.pictureInput.addEventListener('change', () => {
+  const files = [...(els.pictureInput.files || [])];
+  els.pictureInput.value = '';
+  if (files.length) picturesFromFiles(files);
+});
+$('libPictures').addEventListener('click', pickPictures);
+
+/** Browser: pictures picked or dropped as File objects. */
+async function picturesFromFiles(files) {
+  setLoading(t('opening'));
+  const pictures = await Promise.all(
+    files.map(async (file) => ({
+      name: file.name,
+      src: file,
+      modified: file.lastModified || null,
+      taken: await readTakenTime(file),
+      pageNumber: null,
+    })),
+  );
+  setLoading(null);
+  makeBookFromPictures(pictures);
+}
+
+/**
+ * Sorts the pictures, lets the user check the order and title, then turns
+ * them into a PDF book. In the Mac app the PDF is saved into the library
+ * (the app then opens it); in a browser it opens straight away.
+ */
+async function makeBookFromPictures(pictures, folder = '') {
+  if (!pictures.length) return;
+  const { items, method } = sortPictures(pictures);
+  const choice = await arrange(items, { method, title: guessTitle(items, folder) });
+  if (!choice) return;
+  try {
+    const { bytes, skipped } = await makePictureBook(choice.items, choice.title, setLoading);
+    if (skipped) toast(t('picturesSkipped', { n: skipped }), 4000);
+    if (native.active) {
+      native.post('pictures.save', { title: choice.title, data: await toBase64(bytes) });
+    } else {
+      setLoading(null);
+      loadDocument({ data: bytes, name: `${choice.title}.pdf` });
+    }
+  } catch (err) {
+    console.error(err);
+    setLoading(null);
+    toast(t('openFailed', { error: err?.message || err }), 5000);
+  }
+}
+
+function toBase64(bytes) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).split(',')[1]);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(new Blob([bytes], { type: 'application/pdf' }));
+  });
 }
 
 /* ------------------------------------------------------------------------ */
@@ -599,10 +674,17 @@ window.pdbook = {
   library: (payload) => library.update(payload),
   showLibrary,
   toast: (text) => toast(text),
-  dragOverlay: (on) => {
-    els.dropOverlay.firstElementChild.textContent = t('dropToAdd');
+  dragOverlay: (on, pictures = false) => {
+    els.dropOverlay.firstElementChild.textContent = t(pictures ? 'dropPictures' : 'dropToAdd');
     els.dropOverlay.hidden = !on;
   },
+  // Pictures chosen in the Mac app, already analysed (capture time, page numbers).
+  pictures: (list, folder) =>
+    makeBookFromPictures(
+      list.map((p) => ({ ...p, src: p.url })),
+      folder,
+    ),
+  busy: (text) => setLoading(text),
   next,
   prev,
   first: () => goTo(0),

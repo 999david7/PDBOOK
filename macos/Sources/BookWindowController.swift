@@ -10,6 +10,7 @@ final class BookWindowController: NSWindowController, NSWindowDelegate, NSToolba
     private var hasDocument = false
     private var ready = false
     private var pending: URL?
+    private var pendingScripts: [String] = []
     private var webView: WKWebView!
     private let scheme: SchemeHandler
     var onClose: (() -> Void)?
@@ -72,7 +73,9 @@ final class BookWindowController: NSWindowController, NSWindowDelegate, NSToolba
         config.userContentController = content
 
         let webView = BookWebView(frame: window.contentLayoutRect, configuration: config)
-        webView.onDragHover = { [weak self] over in self?.run("window.pdbook.dragOverlay(\(over))") }
+        webView.onDragHover = { [weak self] over, pictures in
+            self?.run("window.pdbook.dragOverlay(\(over), \(pictures))")
+        }
         webView.onDrop = { [weak self] urls in self?.dropped(urls) }
         webView.setValue(false, forKey: "drawsBackground") // no white flash
         webView.navigationDelegate = self
@@ -122,6 +125,8 @@ final class BookWindowController: NSWindowController, NSWindowDelegate, NSToolba
                 pending = nil
                 send(url)
             }
+            pendingScripts.forEach(run)
+            pendingScripts = []
         case "open":
             AppDelegate.shared.showOpenPanel(for: self)
         case "document":
@@ -156,6 +161,10 @@ final class BookWindowController: NSWindowController, NSWindowDelegate, NSToolba
             AppDelegate.shared.promptForLibrary(in: window)
         case "library.restore":
             AppDelegate.shared.restoreSampleBooks(nil)
+        case "pictures.pick":
+            AppDelegate.shared.pickPictures(for: self)
+        case "pictures.save":
+            savePictureBook(title: body["title"] as? String ?? "", base64: body["data"] as? String ?? "")
         default:
             break
         }
@@ -194,8 +203,66 @@ final class BookWindowController: NSWindowController, NSWindowDelegate, NSToolba
         }
     }
 
+    // MARK: - Book from pictures
+
+    /// Reads capture times and printed page numbers, then hands the pictures
+    /// to the page, which sorts them and lets the user check the order.
+    func makeBook(from urls: [URL]) {
+        let files = Pictures.collect(urls)
+        guard !files.isEmpty else {
+            return toast(tr("No pictures found there", "Dort wurden keine Bilder gefunden"))
+        }
+        let total = files.count
+        let reading = tr("Looking at your pictures…", "Deine Bilder werden angeschaut …")
+        busy("\(reading) 0 / \(total)")
+        Pictures.analyze(files, progress: { [weak self] done in
+            self?.busy("\(reading) \(done) / \(total)")
+        }) { [weak self] infos in
+            guard let self else { return }
+            self.busy(nil)
+            guard !infos.isEmpty else {
+                return self.toast(tr("None of the pictures could be read", "Keines der Bilder konnte gelesen werden"))
+            }
+            let ms = { (date: Date?) -> Any in date.map { Int($0.timeIntervalSince1970 * 1000) } ?? NSNull() }
+            let list: [[String: Any]] = infos.map { info in [
+                "url": self.scheme.registerPicture(info.url),
+                "name": info.url.lastPathComponent,
+                "taken": ms(info.taken),
+                "modified": ms(info.modified),
+                "pageNumber": info.pageNumber ?? NSNull(),
+            ] }
+            let parents = Set(infos.map { $0.url.deletingLastPathComponent() })
+            let folder = parents.count == 1 ? parents.first!.lastPathComponent : ""
+            guard let data = try? JSONSerialization.data(withJSONObject: list),
+                  let json = String(data: data, encoding: .utf8) else { return }
+            let script = "window.pdbook.pictures(\(json), \(self.js(folder)))"
+            if self.ready { self.run(script) } else { self.pendingScripts.append(script) }
+        }
+    }
+
+    /// The page made a PDF from the pictures: keep it in the library and open it.
+    private func savePictureBook(title: String, base64: String) {
+        guard let data = Data(base64Encoded: base64) else { return busy(nil) }
+        do {
+            let url = try Library.shared.save(data, title: title)
+            AppDelegate.shared.open(url, preferring: self)
+        } catch {
+            busy(nil)
+            NSAlert(error: error).runModal()
+        }
+    }
+
+    private func busy(_ text: String?) {
+        let script = "window.pdbook.busy(\(text.map(js) ?? "null"))"
+        if ready { run(script) } else if text == nil { pendingScripts.append(script) }
+    }
+
     /// PDFs dropped on the window are added to the library; a single one opens.
+    /// Pictures (or folders of them) dropped on their own become a new book.
     private func dropped(_ urls: [URL]) {
+        let pdfs = urls.filter { $0.pathExtension.lowercased() == "pdf" }
+        if pdfs.isEmpty { return makeBook(from: urls) }
+        let urls = pdfs
         guard Library.shared.isConfigured else {
             if let first = urls.first { AppDelegate.shared.open(first, preferring: self) }
             return
@@ -374,23 +441,24 @@ private final class WeakMessageHandler: NSObject, WKScriptMessageHandler {
     }
 }
 
-/// Handles PDF file drops natively so they can be copied into the library
-/// (the page only sees File objects, not paths).
+/// Handles PDF and picture drops natively so they can be copied into the
+/// library or analysed (the page only sees File objects, not paths).
 private final class BookWebView: WKWebView {
     var onDrop: (([URL]) -> Void)?
-    var onDragHover: ((Bool) -> Void)?
+    var onDragHover: ((_ over: Bool, _ pictures: Bool) -> Void)?
     private var handlingDrag = false
 
-    private func pdfs(_ info: NSDraggingInfo) -> [URL] {
-        let urls = info.draggingPasteboard.readObjects(
+    private func files(_ info: NSDraggingInfo) -> [URL] {
+        info.draggingPasteboard.readObjects(
             forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL] ?? []
-        return urls.filter { $0.pathExtension.lowercased() == "pdf" }
     }
 
     override func draggingEntered(_ info: NSDraggingInfo) -> NSDragOperation {
-        handlingDrag = !pdfs(info).isEmpty
+        let urls = files(info)
+        let hasPDF = urls.contains { $0.pathExtension.lowercased() == "pdf" }
+        handlingDrag = hasPDF || !Pictures.collect(urls).isEmpty
         guard handlingDrag else { return super.draggingEntered(info) }
-        onDragHover?(true)
+        onDragHover?(true, !hasPDF)
         return .copy
     }
 
@@ -401,7 +469,7 @@ private final class BookWebView: WKWebView {
     override func draggingExited(_ info: NSDraggingInfo?) {
         guard handlingDrag else { return super.draggingExited(info) }
         handlingDrag = false
-        onDragHover?(false)
+        onDragHover?(false, false)
     }
 
     override func prepareForDragOperation(_ info: NSDraggingInfo) -> Bool {
@@ -411,8 +479,8 @@ private final class BookWebView: WKWebView {
     override func performDragOperation(_ info: NSDraggingInfo) -> Bool {
         guard handlingDrag else { return super.performDragOperation(info) }
         handlingDrag = false
-        onDragHover?(false)
-        onDrop?(pdfs(info))
+        onDragHover?(false, false)
+        onDrop?(files(info))
         return true
     }
 }

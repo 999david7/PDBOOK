@@ -10,7 +10,21 @@ Open any PDF as a book with realistic page-folding animations. PDBOOK is made fo
   - If the PDF has no cover, generates a cloth-bound cover from the PDF title, or from the file name when there is no title.
   - Splits PDFs that store two-page spreads on one sheet back into single pages. Slide decks stay as they are.
   - Pads the inside pages so every spread is complete.
+- **Books from pictures**: turn photos or scans of pages into a book. PDBOOK sorts them for you (see below).
 - **Lazy, sharp rendering**: only pages near the current one are rendered, at the screen's pixel density, and they are re-rendered when the size changes.
+
+## Make a book from pictures
+
+Click **Book from Pictures** on the shelf, use File ▸ New Book from Pictures… (⇧⌘N), or drop pictures (or a folder of them) onto the window. PDBOOK puts them in order automatically:
+
+1. **Printed page numbers.** The Mac app reads the top and bottom of each picture with macOS text recognition (Vision), so photos of a book's pages end up in page order even if they were taken out of order. Pages without a number, such as the cover, stay next to the page they came after; if the photos were badly shuffled, they go to the front.
+2. **Numbers in the file names**, such as `scan-001.jpg` or `page 10.png`, in natural order (2 before 10).
+3. **When the photos were taken**, from their EXIF data.
+4. **The file date**, as a last resort.
+
+A sheet then shows the pictures in that order. Drag a picture to move it, or use Shift+← / → on a selected picture. Click × to leave a picture out, and change the title if you like. **Make Book** writes a PDF with one picture per page, and every page has the same size. The Mac app saves it in your library and opens it. In a browser it opens straight away; page-number reading needs the Mac app.
+
+JPEG, PNG, HEIC, TIFF, GIF and WebP all work in the Mac app. A browser can only use the formats it can display.
 
 ## Library
 

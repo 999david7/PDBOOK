@@ -47,6 +47,8 @@ enum MainMenu {
         file.addItem(withTitle: tr("Open…", "Öffnen …"), action: #selector(NSDocumentController.openDocument(_:)), keyEquivalent: "o")
         file.addItem(withTitle: tr("Add Books to Library…", "Bücher zur Bibliothek hinzufügen …"),
                      action: #selector(AppDelegate.addBooksToLibrary(_:)), keyEquivalent: "O")
+        file.addItem(withTitle: tr("New Book from Pictures…", "Neues Buch aus Bildern …"),
+                     action: #selector(AppDelegate.makeBookFromPictures(_:)), keyEquivalent: "N")
         file.addItem(withTitle: tr("Add Current Book to Library", "Aktuelles Buch zur Bibliothek hinzufügen"),
                      action: #selector(BookWindowController.addCurrentToLibrary(_:)), keyEquivalent: "d")
         // AppKit fills this menu because it contains a clearRecentDocuments: item.

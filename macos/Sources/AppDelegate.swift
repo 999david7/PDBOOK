@@ -196,6 +196,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    /// Lets the user pick pictures (or a folder of them) to make a new book from.
+    func pickPictures(for controller: BookWindowController?) {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.image]
+        panel.allowsMultipleSelection = true
+        panel.canChooseDirectories = true
+        panel.prompt = tr("Make Book", "Buch machen")
+        panel.message = tr("Choose the pictures for your book, or a folder of pictures. PDBOOK puts them in order for you.",
+                           "Wähle die Bilder für dein Buch oder einen Ordner mit Bildern. PDBOOK bringt sie für dich in die richtige Reihenfolge.")
+        let handle: (NSApplication.ModalResponse) -> Void = { response in
+            guard response == .OK else { return }
+            let target = controller ?? self.windows.first(where: { $0.isEmpty }) ?? self.newWindow()
+            target.showWindow(nil)
+            target.makeBook(from: panel.urls)
+        }
+        if let window = controller?.window, window.isVisible {
+            panel.beginSheetModal(for: window, completionHandler: handle)
+        } else {
+            handle(panel.runModal())
+        }
+    }
+
+    @objc func makeBookFromPictures(_ sender: Any?) {
+        pickPictures(for: keyController)
+    }
+
     @objc func addBooksToLibrary(_ sender: Any?) {
         addBooks(for: keyController)
     }

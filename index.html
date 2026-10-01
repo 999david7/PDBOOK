@@ -44,6 +44,10 @@
             </div>
             <div class="lib-actions">
               <button class="ghost native-only" id="libReveal" data-i18n="showInFinder">Show in Finder</button>
+              <button class="primary teal" id="libPictures">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3" /><circle cx="9" cy="10" r="1.6" /><path d="M5 18l5-5 3 3 2-2 4 4" /></svg>
+                <span data-i18n="picturesButton">Book from Pictures</span>
+              </button>
               <button class="primary" id="libAdd">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
                 <span data-i18n="addBooks">Add Books</span>
@@ -100,9 +104,32 @@
       <div class="indicator" id="indicator"></div>
     </footer>
 
+    <div id="arrange" hidden>
+      <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="arrangeTitle">
+        <header class="sheet-head">
+          <h2 id="arrangeTitle" data-i18n="arrangeTitle">Make a book from your pictures</h2>
+          <p id="arrangeHow"></p>
+        </header>
+        <label class="sheet-field">
+          <span data-i18n="bookTitle">Title</span>
+          <input type="text" id="arrangeName" maxlength="120" autocomplete="off" spellcheck="false" />
+        </label>
+        <ol class="pic-grid" id="arrangeGrid"></ol>
+        <footer class="sheet-foot">
+          <span class="sheet-count" id="arrangeCount"></span>
+          <button class="ghost" id="arrangeCancel" data-i18n="cancel">Cancel</button>
+          <button class="primary" id="arrangeMake">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7c5-2 9-1 9 2v11c0-3-4-4-9-2zM21 7c-5-2-9-1-9 2v11c0-3 4-4 9-2z" /></svg>
+            <span data-i18n="makeBook">Make Book</span>
+          </button>
+        </footer>
+      </div>
+    </div>
+
     <div id="dropOverlay" hidden><div data-i18n="dropToOpen"></div></div>
     <div id="toast" role="status" aria-live="polite"></div>
     <input type="file" id="fileInput" accept="application/pdf,.pdf" hidden />
+    <input type="file" id="pictureInput" accept="image/*" multiple hidden />
 
     <script type="module" src="/src/main.js"></script>
   </body>

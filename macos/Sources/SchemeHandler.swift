@@ -6,11 +6,13 @@ import WebKit
 ///   pdbook://app/<path>            → Contents/Resources/web/<path>
 ///   pdbook://app/__doc/<id>/<name> → a PDF the user opened
 ///   pdbook://app/__lib/<name>      → a book in the library folder
+///   pdbook://app/__img/<id>/<name> → a picture for a new book, as an upright JPEG
 final class SchemeHandler: NSObject, WKURLSchemeHandler {
     static let scheme = "pdbook"
 
     private let root: URL
     private var documents: [String: URL] = [:]
+    private var pictures: [String: URL] = [:]
     private var stopped = Set<ObjectIdentifier>()
 
     init(root: URL) {
@@ -25,13 +27,25 @@ final class SchemeHandler: NSObject, WKURLSchemeHandler {
         return "/__doc/\(id)/\(name)"
     }
 
+    /// Makes a picture reachable from the page (converted to JPEG) and returns its path.
+    func registerPicture(_ file: URL) -> String {
+        let id = UUID().uuidString
+        pictures[id] = file
+        return "/__img/\(id)/picture.jpg"
+    }
+
     func webView(_ webView: WKWebView, start task: WKURLSchemeTask) {
-        guard let url = task.request.url, let file = resolve(url) else {
+        guard let url = task.request.url else { return fail(task, code: NSURLErrorBadURL) }
+        let parts = url.path.split(separator: "/").map(String.init)
+        let picture = parts.first == "__img" && parts.count >= 2 ? pictures[parts[1]] : nil
+        guard let file = picture ?? resolve(url) else {
             return fail(task, code: NSURLErrorFileDoesNotExist)
         }
         let key = ObjectIdentifier(task)
         DispatchQueue.global(qos: .userInitiated).async {
-            let data = try? Data(contentsOf: file, options: .mappedIfSafe)
+            let data = picture != nil
+                ? Pictures.jpegData(file)
+                : try? Data(contentsOf: file, options: .mappedIfSafe)
             DispatchQueue.main.async {
                 guard !self.stopped.contains(key) else {
                     self.stopped.remove(key)
@@ -43,7 +57,7 @@ final class SchemeHandler: NSObject, WKURLSchemeHandler {
                     statusCode: 200,
                     httpVersion: "HTTP/1.1",
                     headerFields: [
-                        "Content-Type": Self.mimeType(for: file.pathExtension),
+                        "Content-Type": picture != nil ? "image/jpeg" : Self.mimeType(for: file.pathExtension),
                         "Content-Length": String(data.count),
                         "Cache-Control": "no-cache",
                     ]
