@@ -25,7 +25,7 @@ final class Updater: NSObject, NSMenuItemValidation, URLSessionDownloadDelegate 
         static let feedOverride = "UpdateFeedURL" // for testing a staging feed
     }
 
-    private static let checkInterval: TimeInterval = 6 * 60 * 60
+    private static let checkInterval: TimeInterval = 2 * 60 * 60
 
     private var checking = false
     private var timer: Timer?
@@ -61,8 +61,10 @@ final class Updater: NSObject, NSMenuItemValidation, URLSessionDownloadDelegate 
 
     func start() {
         UserDefaults.standard.register(defaults: [Keys.automatic: true])
-        // Give launch a moment, then check; keep checking while the app runs.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 5) { self.checkIfDue() }
+        // Check shortly after every launch, then periodically while running.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+            if self.automaticallyChecks { self.check(userInitiated: false) }
+        }
         timer = Timer.scheduledTimer(withTimeInterval: 30 * 60, repeats: true) { [weak self] _ in
             self?.checkIfDue()
         }
