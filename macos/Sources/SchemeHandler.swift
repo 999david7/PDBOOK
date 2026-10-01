@@ -5,6 +5,7 @@ import WebKit
 /// page gets a real origin (module workers, fetch, wasm) without a server.
 ///   pdbook://app/<path>            → Contents/Resources/web/<path>
 ///   pdbook://app/__doc/<id>/<name> → a PDF the user opened
+///   pdbook://app/__lib/<name>      → a book in the library folder
 final class SchemeHandler: NSObject, WKURLSchemeHandler {
     static let scheme = "pdbook"
 
@@ -62,6 +63,9 @@ final class SchemeHandler: NSObject, WKURLSchemeHandler {
         let parts = url.path.split(separator: "/").map(String.init)
         if parts.first == "__doc", parts.count >= 2 {
             return documents[parts[1]]
+        }
+        if parts.first == "__lib", parts.count == 2 {
+            return Library.shared.file(named: parts[1])
         }
         let relative = parts.isEmpty ? "index.html" : parts.joined(separator: "/")
         let file = root.appendingPathComponent(relative).standardizedFileURL

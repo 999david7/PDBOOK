@@ -15,6 +15,9 @@
       </div>
       <div class="doc-title" id="docTitle"></div>
       <div class="actions">
+        <button class="icon-btn" id="libraryBtn" title="Library" aria-label="Back to library" hidden>
+          <svg viewBox="0 0 24 24"><path d="M5 4v16M9 4v16M13 5l4 15M19 20H4" /></svg>
+        </button>
         <button class="icon-btn" id="openBtn" title="Open PDF (O)" aria-label="Open PDF">
           <svg viewBox="0 0 24 24"><path d="M4 20V6a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v2" /><path d="M4 20l3-8h15l-3 8z" /></svg>
         </button>
@@ -25,18 +28,46 @@
     </header>
 
     <main id="stage">
-      <section id="welcome">
-        <div class="drop-card" id="dropCard">
-          <div class="drop-art" aria-hidden="true">
-            <div class="mini-book"><span></span><span></span><span></span></div>
+      <section id="library">
+        <div class="lib-inner">
+          <header class="lib-head">
+            <div>
+              <h1>Library</h1>
+              <p class="lib-sub">
+                <span id="libCount"></span>
+                <span class="native-only"> · <button class="link" id="libLocation" title="Change library location…"></button></span>
+              </p>
+            </div>
+            <div class="lib-actions">
+              <button class="ghost native-only" id="libReveal">Show in Finder</button>
+              <button class="primary" id="libAdd">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+                Add Books
+              </button>
+            </div>
+          </header>
+
+          <div class="lib-message" id="libSetup" hidden>
+            <div class="drop-art" aria-hidden="true">
+              <div class="mini-book"><span></span><span></span><span></span></div>
+            </div>
+            <h2>Choose where to keep your books</h2>
+            <p>PDBOOK creates a “PDBOOK Library” folder there, with five free sample books to get you started.</p>
+            <button class="primary" id="libChoose">Choose Library Folder…</button>
           </div>
-          <h1>Turn any PDF into a book</h1>
-          <p>Drop a PDF here, or pick one. The cover is found automatically and the book resizes to fit your screen.</p>
-          <div class="drop-actions">
-            <button class="primary" id="chooseBtn">Choose PDF</button>
-            <button class="ghost" id="sampleBtn">Try a sample</button>
+
+          <div class="shelf" id="shelf"></div>
+
+          <div class="lib-message" id="libEmpty" hidden>
+            <div class="drop-art" aria-hidden="true">
+              <div class="mini-book"><span></span><span></span><span></span></div>
+            </div>
+            <h2>Your library is empty</h2>
+            <p>Add PDFs with <strong>Add Books</strong>, or drop them onto this window.</p>
+            <button class="link native-only" id="libRestore">Restore the free sample books</button>
           </div>
-          <p class="hint">Swipe, drag a page corner, click the arrows, or use ← →</p>
+
+          <p class="lib-note web-only" id="libNote"></p>
         </div>
       </section>
 

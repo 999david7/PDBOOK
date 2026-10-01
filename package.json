@@ -9,10 +9,10 @@
     "prebuild": "node scripts/copy-pdfjs-assets.mjs",
     "build": "vite build",
     "preview": "vite preview",
-    "sample": "node scripts/make-sample.mjs",
     "mac": "bash macos/build.sh",
     "update-keys": "xcrun swift macos/update-tool.swift keygen",
-    "release": "bash macos/release.sh"
+    "release": "bash macos/release.sh",
+    "samples": "node scripts/make-samples.mjs"
   },
   "keywords": [],
   "author": "",

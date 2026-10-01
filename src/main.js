@@ -1,14 +1,17 @@
 import { PageFlip } from 'page-flip/dist/js/page-flip.module.js';
-import { openPdf, readTitle, renderLogicalPage } from './pdf.js';
+import { openPdf, readTitle, renderLogicalPage, closePdf } from './pdf.js';
 import { buildBook } from './layout.js';
 import { PageTurner, FORWARD, BACK } from './turner.js';
 import { native } from './native.js';
+import { makeCover, makeBackCover } from './covers.js';
+import { createLibrary } from './library.js';
 import './style.css';
 
 const $ = (id) => document.getElementById(id);
 const els = {
   stage: $('stage'),
-  welcome: $('welcome'),
+  library: $('library'),
+  libraryBtn: $('libraryBtn'),
   bookArea: $('bookArea'),
   bookShift: $('bookShift'),
   bookBed: $('bookBed'),
@@ -59,10 +62,10 @@ async function loadDocument(source) {
 
     const size = data.length; // pdf.js may transfer (detach) the buffer
     const pdf = await openPdf(data);
-    if (loadId !== state.loadId) return pdf.destroy();
+    if (loadId !== state.loadId) return closePdf(pdf);
     const meta = await readTitle(pdf, name);
     const book = await buildBook(pdf, setLoading);
-    if (loadId !== state.loadId) return pdf.destroy();
+    if (loadId !== state.loadId) return closePdf(pdf);
 
     teardown();
     state.pdf = pdf;
@@ -71,7 +74,8 @@ async function loadDocument(source) {
     els.docTitle.textContent = meta.title;
     document.title = `${meta.title} · PDBOOK`;
 
-    els.welcome.hidden = true;
+    els.library.hidden = true;
+    els.libraryBtn.hidden = false;
     els.bookArea.hidden = false;
     els.prev.hidden = els.next.hidden = false;
     els.bottombar.hidden = false;
@@ -111,7 +115,7 @@ function teardown() {
   for (const { canvas } of state.rendered.values()) canvas.width = 0;
   state.rendered.clear();
   state.pageEls = [];
-  state.pdf?.destroy();
+  closePdf(state.pdf);
   state.pdf = null;
 }
 
@@ -213,9 +217,9 @@ function createPageEl(p, i, mode) {
     if (cached) inner.append(cached.canvas);
     else inner.append(spinner());
   } else if (p.kind === 'cover') {
-    inner.append(generatedCover());
+    inner.append(makeCover(state.meta.title, state.meta.author));
   } else if (p.kind === 'back') {
-    inner.append(generatedBack());
+    inner.append(makeBackCover(state.meta.title));
   } else {
     inner.classList.add('paper', 'blank');
   }
@@ -226,61 +230,6 @@ function spinner() {
   const s = document.createElement('div');
   s.className = 'page-spinner';
   return s;
-}
-
-const CLOTH = [
-  ['#1f3a5f', '#d9b36a'],
-  ['#5a1f2b', '#e0c27a'],
-  ['#20463a', '#d8bf7c'],
-  ['#2d2a4a', '#c9b37e'],
-  ['#3b2f25', '#d6ae62'],
-];
-
-function clothFor(title) {
-  let h = 0;
-  for (const c of title) h = (h * 31 + c.charCodeAt(0)) >>> 0;
-  return CLOTH[h % CLOTH.length];
-}
-
-function generatedCover() {
-  const { title, author } = state.meta;
-  const [bg, fg] = clothFor(title);
-  const el = document.createElement('div');
-  el.className = 'gen-cover';
-  el.style.setProperty('--cloth', bg);
-  el.style.setProperty('--foil', fg);
-  const frame = document.createElement('div');
-  frame.className = 'gen-frame';
-  const h = document.createElement('h2');
-  h.textContent = title;
-  h.style.fontSize = `${title.length > 60 ? 0.75 : title.length > 30 ? 0.95 : 1.2}em`;
-  const rule = document.createElement('div');
-  rule.className = 'gen-rule';
-  frame.append(rule, h);
-  if (author) {
-    const a = document.createElement('p');
-    a.textContent = author;
-    frame.append(a);
-  }
-  const orn = document.createElement('div');
-  orn.className = 'gen-ornament';
-  orn.textContent = '❦';
-  frame.append(orn);
-  el.append(frame);
-  return el;
-}
-
-function generatedBack() {
-  const [bg, fg] = clothFor(state.meta.title);
-  const el = document.createElement('div');
-  el.className = 'gen-cover gen-back';
-  el.style.setProperty('--cloth', bg);
-  el.style.setProperty('--foil', fg);
-  const orn = document.createElement('div');
-  orn.className = 'gen-ornament';
-  orn.textContent = '❦';
-  el.append(orn);
-  return el;
 }
 
 /* ------------------------------------------------------------------------ */
@@ -528,10 +477,7 @@ function openFile() {
 }
 
 $('openBtn').addEventListener('click', openFile);
-$('chooseBtn').addEventListener('click', openFile);
-$('sampleBtn').addEventListener('click', () =>
-  loadDocument({ url: `${import.meta.env.BASE_URL}sample.pdf` }),
-);
+els.libraryBtn.addEventListener('click', () => showLibrary());
 $('fsBtn').addEventListener('click', toggleFullscreen);
 
 els.fileInput.addEventListener('change', () => {
@@ -607,9 +553,47 @@ function writeStore(key, value) {
   }
 }
 
+/* ------------------------------------------------------------------------ */
+/* Library                                                                  */
+/* ------------------------------------------------------------------------ */
+
+const library = createLibrary({
+  root: els.library,
+  onOpen: (book) => {
+    if (native.active) native.post('library.open', { name: book.name });
+    else loadDocument({ url: book.url, name: book.name });
+  },
+  onAddInBrowser: () => els.fileInput.click(),
+});
+
+/** Close the current book and return to the shelf. */
+function showLibrary() {
+  state.loadId++;
+  teardown();
+  turner.reset();
+  state.book = null;
+  state.posKey = null;
+  els.bookArea.hidden = true;
+  els.prev.hidden = els.next.hidden = true;
+  els.bottombar.hidden = true;
+  els.libraryBtn.hidden = true;
+  els.library.hidden = false;
+  els.docTitle.textContent = '';
+  document.title = 'PDBOOK';
+  delete els.stage.dataset.mode;
+  native.post('library.shown');
+}
+
 // API used by the macOS app's menus and Finder "Open With".
 window.pdbook = {
   open: (url, name, start) => loadDocument({ url, name, start }),
+  library: (payload) => library.update(payload),
+  showLibrary,
+  toast: (text) => toast(text),
+  dragOverlay: (on) => {
+    els.dropOverlay.firstElementChild.textContent = 'Drop to add to your library';
+    els.dropOverlay.hidden = !on;
+  },
   next,
   prev,
   first: () => goTo(0),

@@ -95,6 +95,24 @@ async function analyze(pdf, lp) {
 }
 
 /**
+ * Quick front-cover lookup for library thumbnails: checks only the first few
+ * pages. Returns the logical page to render, or null when the PDF has no
+ * cover-like first page (a cover is then generated from the title).
+ */
+export async function findFrontCover(pdf) {
+  const n = Math.min(SCAN_FRONT, pdf.numPages);
+  for (let i = 0; i < n; i++) {
+    const page = await pdf.getPage(i + 1);
+    const vp = page.getViewport({ scale: 1 });
+    const lp = { kind: 'pdf', pdfIndex: i, half: null, w: vp.width, h: vp.height };
+    const s = await analyze(pdf, lp);
+    if (s.blank) continue;
+    return s.cover ? lp : null;
+  }
+  return null;
+}
+
+/**
  * Returns the ordered list of book pages:
  *   { kind: 'pdf' | 'cover' | 'back' | 'blank', ...}
  * The first page is always the front cover and the last the back cover.

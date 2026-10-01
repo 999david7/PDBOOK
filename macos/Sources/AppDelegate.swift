@@ -33,6 +33,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // When launched by opening a PDF, application(_:open:) already ran.
         if windows.isEmpty { newWindow().showWindow(nil) }
         NSApp.activate(ignoringOtherApps: true)
+        if !Library.shared.isConfigured {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                self.promptForLibrary(in: self.windows.first?.window)
+            }
+        }
         Updater.shared.start()
     }
 
@@ -107,5 +112,104 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func newWindowAction(_ sender: Any?) {
         newWindow().showWindow(nil)
+    }
+
+    // MARK: - Library
+
+    private var keyController: BookWindowController? {
+        NSApp.keyWindow?.windowController as? BookWindowController ?? windows.first
+    }
+
+    /// First run (or if the user dismissed it): choose where the library lives.
+    func promptForLibrary(in window: NSWindow?) {
+        let alert = NSAlert()
+        alert.icon = NSApp.applicationIconImage
+        alert.messageText = "Where should PDBOOK keep your books?"
+        alert.informativeText = "PDBOOK will create a “\(Library.folderName)” folder there. Books you add are "
+            + "copied into it, and five free sample books are included to get you started — you can delete any of them."
+        alert.addButton(withTitle: "Use Documents Folder")
+        alert.addButton(withTitle: "Choose Folder…")
+        let handle: (NSApplication.ModalResponse) -> Void = { response in
+            if response == .alertFirstButtonReturn {
+                let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+                self.perform { try Library.shared.setUp(in: documents) }
+            } else {
+                self.chooseFolder(for: window, prompt: "Create Library Here") { parent in
+                    self.perform { try Library.shared.setUp(in: parent) }
+                }
+            }
+        }
+        if let window, window.isVisible, window.attachedSheet == nil {
+            alert.beginSheetModal(for: window, completionHandler: handle)
+        } else {
+            handle(alert.runModal())
+        }
+    }
+
+    private func chooseFolder(for window: NSWindow?, prompt: String, completion: @escaping (URL) -> Void) {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.canCreateDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.prompt = prompt
+        panel.message = "PDBOOK will create a “\(Library.folderName)” folder in the location you choose."
+        panel.directoryURL = Library.shared.folder?.deletingLastPathComponent()
+            ?? FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
+        let handle: (NSApplication.ModalResponse) -> Void = { response in
+            if response == .OK, let url = panel.url { completion(url) }
+        }
+        if let window, window.isVisible { panel.beginSheetModal(for: window, completionHandler: handle) }
+        else { handle(panel.runModal()) }
+    }
+
+    private func perform(_ work: () throws -> Void) {
+        do { try work() } catch { NSAlert(error: error).runModal() }
+    }
+
+    /// Lets the user pick PDFs and copies them into the library.
+    func addBooks(for controller: BookWindowController?) {
+        guard Library.shared.isConfigured else { return promptForLibrary(in: controller?.window) }
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.pdf]
+        panel.allowsMultipleSelection = true
+        panel.canChooseDirectories = false
+        panel.prompt = "Add to Library"
+        panel.message = "Choose PDFs to copy into your library"
+        let handle: (NSApplication.ModalResponse) -> Void = { response in
+            guard response == .OK else { return }
+            self.perform {
+                let added = try Library.shared.add(panel.urls)
+                controller?.toast(added.count == 1 ? "Added 1 book to your library" : "Added \(added.count) books to your library")
+            }
+        }
+        if let window = controller?.window, window.isVisible {
+            panel.beginSheetModal(for: window, completionHandler: handle)
+        } else {
+            handle(panel.runModal())
+        }
+    }
+
+    @objc func addBooksToLibrary(_ sender: Any?) {
+        addBooks(for: keyController)
+    }
+
+    @objc func changeLibraryLocation(_ sender: Any?) {
+        guard Library.shared.isConfigured else { return promptForLibrary(in: keyController?.window) }
+        chooseFolder(for: keyController?.window, prompt: "Move Library Here") { parent in
+            self.perform { try Library.shared.move(to: parent) }
+        }
+    }
+
+    @objc func showLibraryInFinder(_ sender: Any?) {
+        guard let folder = Library.shared.folder else { return promptForLibrary(in: keyController?.window) }
+        NSWorkspace.shared.activateFileViewerSelecting([folder])
+    }
+
+    @objc func restoreSampleBooks(_ sender: Any?) {
+        guard Library.shared.isConfigured else { return promptForLibrary(in: keyController?.window) }
+        let count = Library.shared.installSamples()
+        keyController?.toast(count == 0 ? "All sample books are already in your library"
+                                        : "Restored \(count) sample book\(count == 1 ? "" : "s")")
     }
 }

@@ -45,6 +45,10 @@ enum MainMenu {
         let file = submenu("File")
         file.addItem(withTitle: "New Window", action: #selector(AppDelegate.newWindowAction(_:)), keyEquivalent: "n")
         file.addItem(withTitle: "Open…", action: #selector(NSDocumentController.openDocument(_:)), keyEquivalent: "o")
+        file.addItem(withTitle: "Add Books to Library…",
+                     action: #selector(AppDelegate.addBooksToLibrary(_:)), keyEquivalent: "O")
+        file.addItem(withTitle: "Add Current Book to Library",
+                     action: #selector(BookWindowController.addCurrentToLibrary(_:)), keyEquivalent: "d")
         // AppKit fills this menu because it contains a clearRecentDocuments: item.
         let recent = NSMenuItem(title: "Open Recent", action: nil, keyEquivalent: "")
         let recentMenu = NSMenu(title: "Open Recent")
@@ -52,6 +56,13 @@ enum MainMenu {
                            action: #selector(NSDocumentController.clearRecentDocuments(_:)), keyEquivalent: "")
         recent.submenu = recentMenu
         file.addItem(recent)
+        file.addItem(.separator())
+        file.addItem(withTitle: "Show Library in Finder",
+                     action: #selector(AppDelegate.showLibraryInFinder(_:)), keyEquivalent: "")
+        file.addItem(withTitle: "Change Library Location…",
+                     action: #selector(AppDelegate.changeLibraryLocation(_:)), keyEquivalent: "")
+        file.addItem(withTitle: "Restore Sample Books",
+                     action: #selector(AppDelegate.restoreSampleBooks(_:)), keyEquivalent: "")
         file.addItem(.separator())
         file.addItem(withTitle: "Close", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
 
@@ -62,6 +73,8 @@ enum MainMenu {
 
         // View
         let view = submenu("View")
+        view.addItem(withTitle: "Show Library", action: #selector(BookWindowController.showLibrary(_:)), keyEquivalent: "l")
+        view.addItem(.separator())
         view.addItem(withTitle: "Previous Page",
                      action: #selector(BookWindowController.previousPage(_:)),
                      keyEquivalent: arrow(NSLeftArrowFunctionKey)).keyEquivalentModifierMask = []

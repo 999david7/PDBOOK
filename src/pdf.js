@@ -86,3 +86,8 @@ export async function countTextChars(pdf, pdfIndex) {
     return 0;
   }
 }
+
+/** Frees a document and its worker resources (pdf.js v6 moved destroy() to the loading task). */
+export function closePdf(pdf) {
+  pdf?.loadingTask?.destroy().catch(() => {});
+}
