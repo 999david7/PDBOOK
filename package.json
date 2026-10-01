@@ -1,6 +1,6 @@
 {
   "name": "pdbook",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "PDF files as a flippable book",
   "scripts": {
     "postinstall": "node scripts/copy-pdfjs-assets.mjs",
