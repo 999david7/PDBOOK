@@ -59,3 +59,14 @@ export function makeBackCover(title) {
   el.append(ornament());
   return el;
 }
+
+/** Fills a page the layout had to leave empty, so it looks meant to be. */
+export function makeFiller() {
+  const el = document.createElement('div');
+  el.className = 'filler';
+  const badge = document.createElement('div');
+  badge.className = 'filler-badge';
+  badge.textContent = '★';
+  el.append(badge);
+  return el;
+}

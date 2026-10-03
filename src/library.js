@@ -1,9 +1,10 @@
 // The library screen: a bookshelf of covers.
 //  - In the macOS app the books come from the library folder (pushed by the
 //    native side via window.pdbook.library(payload)); removing moves the file
-//    to the Trash after a native confirmation.
+//    to the Trash after a native confirmation, renaming renames the file.
 //  - In a browser there is no folder to save to, so the shelf shows the
-//    bundled sample books; removing one hides it (and it can be restored).
+//    bundled sample books; removing one hides it (and it can be restored),
+//    and new names are remembered in this browser.
 import { openPdf, readTitle, renderLogicalPage, closePdf } from './pdf.js';
 import { findFrontCover } from './layout.js';
 import { makeCover } from './covers.js';
@@ -13,6 +14,7 @@ import { t, lang } from './i18n.js';
 const BASE = import.meta.env.BASE_URL;
 const THUMB_WIDTH = 320;
 const HIDDEN_KEY = 'pdbook:hiddenSamples';
+const TITLES_KEY = 'pdbook:sampleTitles';
 const THUMB_PREFIX = 'pdbook:thumb:';
 
 export function createLibrary({ root, onOpen, onAddInBrowser }) {
@@ -73,9 +75,17 @@ export function createLibrary({ root, onOpen, onAddInBrowser }) {
       // No samples available.
     }
     const hidden = new Set(readJSON(HIDDEN_KEY, []));
+    const titles = readJSON(TITLES_KEY, {});
     books = list
       .filter((b) => !hidden.has(b.file))
-      .map((b) => ({ name: b.file, title: b.title, author: b.author, url: `${BASE}samples/${lang}/${b.file}`, size: b.size || 0, mtime: 0 }));
+      .map((b) => ({
+        name: b.file,
+        title: titles[b.file] || b.title,
+        author: b.author,
+        url: `${BASE}samples/${lang}/${b.file}`,
+        size: b.size || 0,
+        mtime: 0,
+      }));
     const removed = list.filter((b) => hidden.has(b.file)).length;
     els.note.replaceChildren(t('browserNote'));
     if (removed) {
@@ -131,6 +141,12 @@ export function createLibrary({ root, onOpen, onAddInBrowser }) {
     const title = document.createElement('div');
     title.className = 'book-title';
 
+    const rename = document.createElement('button');
+    rename.className = 'book-rename';
+    rename.title = t('renameBook');
+    rename.innerHTML =
+      '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4"/></svg>';
+
     const remove = document.createElement('button');
     remove.className = 'book-remove';
     remove.innerHTML =
@@ -138,17 +154,20 @@ export function createLibrary({ root, onOpen, onAddInBrowser }) {
     const verb = native.active ? t('moveToTrash') : t('removeFromShelf');
     remove.title = verb;
 
-    el.append(wrap, title, remove);
-    const label = () => thumbs.get(key)?.title || book.title || titleFromName(book.name);
+    el.append(wrap, title, rename, remove);
+    // A name the user gave the book wins over the title inside the PDF.
+    const label = () => book.title || thumbs.get(key)?.title || titleFromName(book.name);
     const setText = () => {
+      if (title.querySelector('input')) return;
       title.textContent = label();
       el.setAttribute('aria-label', t('openBook', { title: label() }));
+      rename.setAttribute('aria-label', `${t('renameBook')}: ${label()}`);
       remove.setAttribute('aria-label', `${verb}: ${label()}`);
     };
     setText();
 
     el.addEventListener('click', (e) => {
-      if (e.target.closest('.book-remove')) return;
+      if (e.target.closest('.book-remove, .book-rename, .book-title input')) return;
       onOpen(book);
     });
     el.addEventListener('keydown', (e) => {
@@ -165,6 +184,43 @@ export function createLibrary({ root, onOpen, onAddInBrowser }) {
       e.stopPropagation();
       removeBook(book, label());
     });
+    rename.addEventListener('click', (e) => {
+      e.stopPropagation();
+      editTitle();
+    });
+
+    /** Swaps the title for a text field; Enter or leaving it saves, Esc cancels. */
+    function editTitle() {
+      if (title.querySelector('input')) return;
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.maxLength = 120;
+      input.spellcheck = false;
+      input.autocomplete = 'off';
+      input.value = label();
+      input.setAttribute('aria-label', t('renameBook'));
+      title.replaceChildren(input);
+      el.classList.add('is-renaming');
+      input.focus();
+      input.select();
+      let done = false;
+      const finish = (save) => {
+        if (done) return;
+        done = true;
+        const value = input.value.trim();
+        el.classList.remove('is-renaming');
+        title.replaceChildren();
+        if (save && value && value !== label()) renameBook(book, value);
+        setText();
+        if (!save) el.focus();
+      };
+      input.addEventListener('keydown', (e) => {
+        e.stopPropagation();
+        if (e.key === 'Enter') finish(true);
+        else if (e.key === 'Escape') finish(false);
+      });
+      input.addEventListener('blur', () => finish(true));
+    }
 
     el._apply = () => {
       const t = thumbs.get(key);
@@ -176,7 +232,7 @@ export function createLibrary({ root, onOpen, onAddInBrowser }) {
         img.src = t.img;
         cover.replaceChildren(img);
       } else {
-        cover.replaceChildren(makeCover(t.title, t.author));
+        cover.replaceChildren(makeCover(label(), t.author));
         cover.classList.add('is-generated');
       }
       setText();
@@ -189,6 +245,17 @@ export function createLibrary({ root, onOpen, onAddInBrowser }) {
     if (thumbs.has(key)) el._apply();
     else if (!queue.some((q) => keyOf(q) === key)) queue.push(book);
     return el;
+  }
+
+  function renameBook(book, title) {
+    book.title = title; // shows straight away; the Mac app then sends the new list
+    if (native.active) {
+      native.post('library.rename', { name: book.name, title });
+      return;
+    }
+    const titles = readJSON(TITLES_KEY, {});
+    titles[book.name] = title;
+    writeJSON(TITLES_KEY, titles);
   }
 
   function removeBook(book, title) {

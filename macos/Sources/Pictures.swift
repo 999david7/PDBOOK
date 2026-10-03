@@ -1,17 +1,33 @@
 import AppKit
+import CoreImage
 import ImageIO
 import UniformTypeIdentifiers
 import Vision
 
 /// Pictures that are about to become a book. Finds the image files, reads
-/// when each photo was taken and looks for a printed page number with Vision
-/// text recognition, so the page can put them in the right order.
+/// when each photo was taken, finds the book page in a photo (cropped from
+/// the table it lies on, straightened and turned upright) and looks for a
+/// printed page number with Vision text recognition, so the page can put
+/// them in the right order and spot double pages.
 enum Pictures {
     struct Info {
         let url: URL
         let taken: Date?
         let modified: Date?
         let pageNumber: Int?
+        let page: Page
+        /// Width / height of the page once cropped and turned upright.
+        let aspect: Double
+    }
+
+    /// Where the book page is in a photo and which way up it is.
+    struct Page {
+        /// Corners (top left, top right, bottom right, bottom left) in
+        /// normalised image coordinates with a bottom-left origin, or nil to
+        /// keep the whole picture.
+        var quad: [CGPoint]?
+        /// How to turn the cropped page so its text reads upright.
+        var turn: CGImagePropertyOrientation = .up
     }
 
     static func isImage(_ url: URL) -> Bool {
@@ -56,13 +72,16 @@ enum Pictures {
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
               CGImageSourceGetCount(source) > 0,
               let image = thumbnail(source, maxPixel: 1600) else { return nil }
+        let page = findPage(in: image)
+        let upright = corrected(image, page) ?? image
         let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]
         let exif = props?[kCGImagePropertyExifDictionary] as? [CFString: Any]
         let tiff = props?[kCGImagePropertyTIFFDictionary] as? [CFString: Any]
         let stamp = (exif?[kCGImagePropertyExifDateTimeOriginal] ?? tiff?[kCGImagePropertyTIFFDateTime]) as? String
         let modified = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
         return Info(url: url, taken: stamp.flatMap { exifDate.date(from: $0) },
-                    modified: modified, pageNumber: pageNumber(in: image))
+                    modified: modified, pageNumber: pageNumber(in: upright), page: page,
+                    aspect: Double(upright.width) / Double(max(upright.height, 1)))
     }
 
     private static let exifDate: DateFormatter = {
@@ -79,6 +98,86 @@ enum Pictures {
             kCGImageSourceCreateThumbnailWithTransform: true,
             kCGImageSourceThumbnailMaxPixelSize: maxPixel,
         ] as CFDictionary)
+    }
+
+    // MARK: - Finding the page
+
+    /// Finds the book page (or open double page) in a photo with document
+    /// segmentation, and which way up it is from the direction its text runs.
+    static func findPage(in image: CGImage) -> Page {
+        let segmentation = VNDetectDocumentSegmentationRequest()
+        let text = VNRecognizeTextRequest()
+        text.recognitionLevel = .accurate
+        text.usesLanguageCorrection = false
+        try? VNImageRequestHandler(cgImage: image).perform([segmentation, text])
+
+        var page = Page()
+        if let doc = segmentation.results?.first, doc.confidence > 0.5 {
+            let quad = [doc.topLeft, doc.topRight, doc.bottomRight, doc.bottomLeft]
+            // A tiny find is probably a detail, a near-total one a scan that
+            // needs no cropping.
+            let area = Self.area(quad)
+            if area > 0.2 && area < 0.97 { page.quad = inset(quad, by: 0.006) }
+        }
+        page.turn = uprightTurn(text.results ?? [], width: image.width, height: image.height)
+        return page
+    }
+
+    /// Accurate text recognition reads text at any right angle; the way the
+    /// lines run says how the photo is turned. Each line votes with its length.
+    private static func uprightTurn(_ lines: [VNRecognizedTextObservation], width: Int, height: Int) -> CGImagePropertyOrientation {
+        var votes: [CGImagePropertyOrientation: Double] = [:]
+        for line in lines {
+            guard let best = line.topCandidates(1).first, best.string.count >= 3 else { continue }
+            let dx = (line.topRight.x - line.topLeft.x) * CGFloat(width)
+            let dy = (line.topRight.y - line.topLeft.y) * CGFloat(height) // up is positive
+            let turn: CGImagePropertyOrientation = abs(dx) >= abs(dy)
+                ? (dx > 0 ? .up : .down)
+                : (dy < 0 ? .left : .right) // running down the photo: turn it a quarter left
+            votes[turn, default: 0] += Double(best.string.count) * Double(best.confidence)
+        }
+        let total = votes.values.reduce(0, +)
+        guard total >= 12, let (turn, weight) = votes.max(by: { $0.value < $1.value }),
+              weight >= total * 0.7 else { return .up }
+        return turn
+    }
+
+    private static func area(_ quad: [CGPoint]) -> CGFloat {
+        var sum: CGFloat = 0
+        for i in quad.indices {
+            let a = quad[i], b = quad[(i + 1) % quad.count]
+            sum += a.x * b.y - b.x * a.y
+        }
+        return abs(sum) / 2
+    }
+
+    /// Pulls the corners towards the middle, so the page edge, the book's
+    /// cover board and slivers of table don't show.
+    private static func inset(_ quad: [CGPoint], by amount: CGFloat) -> [CGPoint] {
+        let cx = quad.map(\.x).reduce(0, +) / 4, cy = quad.map(\.y).reduce(0, +) / 4
+        return quad.map { CGPoint(x: $0.x + (cx - $0.x) * amount * 2, y: $0.y + (cy - $0.y) * amount * 2) }
+    }
+
+    private static let context = CIContext(options: [.useSoftwareRenderer: false])
+
+    /// The page cut out of the photo, straightened and turned upright, or
+    /// nil when there is nothing to change.
+    static func corrected(_ image: CGImage, _ page: Page) -> CGImage? {
+        guard page.quad != nil || page.turn != .up else { return nil }
+        var ci = CIImage(cgImage: image)
+        if let quad = page.quad, let filter = CIFilter(name: "CIPerspectiveCorrection") {
+            let size = CGSize(width: image.width, height: image.height)
+            let keys = ["inputTopLeft", "inputTopRight", "inputBottomRight", "inputBottomLeft"]
+            filter.setValue(ci, forKey: kCIInputImageKey)
+            for (key, p) in zip(keys, quad) {
+                filter.setValue(CIVector(x: p.x * size.width, y: p.y * size.height), forKey: key)
+            }
+            if let output = filter.outputImage { ci = output }
+        }
+        ci = ci.oriented(page.turn)
+        let extent = ci.extent.integral
+        guard extent.width >= 1, extent.height >= 1 else { return nil }
+        return context.createCGImage(ci, from: extent)
     }
 
     // MARK: - Page numbers
@@ -142,11 +241,12 @@ enum Pictures {
 
     // MARK: - Serving
 
-    /// The picture as an upright JPEG on white (no alpha), at most `maxPixel`
-    /// on its long side, so the page can decode any format macOS can (HEIC…).
-    static func jpegData(_ url: URL, maxPixel: Int = 2000) -> Data? {
-        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
-              let image = thumbnail(source, maxPixel: maxPixel),
+    /// The book page in the picture (see `corrected`) as an upright JPEG on
+    /// white (no alpha), at most `maxPixel` on its long side, so the page can
+    /// decode any format macOS can (HEIC…).
+    static func jpegData(_ info: Info, maxPixel: Int = 3000) -> Data? {
+        guard let source = CGImageSourceCreateWithURL(info.url as CFURL, nil),
+              let image = thumbnail(source, maxPixel: maxPixel).map({ corrected($0, info.page) ?? $0 }),
               let space = CGColorSpace(name: CGColorSpace.sRGB),
               let ctx = CGContext(data: nil, width: image.width, height: image.height, bitsPerComponent: 8,
                                   bytesPerRow: 0, space: space,

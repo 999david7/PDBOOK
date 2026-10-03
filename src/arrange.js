@@ -1,7 +1,9 @@
 // The "make a book from pictures" sheet: shows the pictures in the order
 // they were sorted into, lets you drag them around (or Shift+←/→), remove
-// ones you don't want and name the book.
+// ones you don't want, switch a picture between single and double page and
+// name the book.
 import { t } from './i18n.js';
+import { markSpreads, turnPicture } from './pictures.js';
 
 const $ = (id) => document.getElementById(id);
 const els = {
@@ -26,7 +28,10 @@ export function arrange(items, { method, title }) {
   session?.resolve(null);
   return new Promise((resolve) => {
     session = { items: [...items], urls: new Map(), resolve };
-    els.how.textContent = `${t(`sortedBy_${method}`)} ${t('arrangeHint')}`;
+    const spreads = items.filter((p) => p.spread).length;
+    els.how.textContent = [t(`sortedBy_${method}`), spreads && t('spreadsFound', { n: spreads }), t('arrangeHint')]
+      .filter(Boolean)
+      .join(' ');
     els.name.value = title;
     els.root.hidden = false;
     render();
@@ -59,7 +64,7 @@ function render(focusIndex = -1) {
 
 function tile(p, i) {
   const li = document.createElement('li');
-  li.className = 'pic';
+  li.className = p.spread ? 'pic spread' : 'pic';
   li.tabIndex = 0;
   li.draggable = true;
   li.title = p.name;
@@ -96,7 +101,36 @@ function tile(p, i) {
     render(i);
   });
 
-  li.append(img, num, remove);
+  const spread = document.createElement('button');
+  spread.className = 'pic-spread';
+  spread.type = 'button';
+  spread.title = t(p.spread ? 'spreadOn' : 'spreadOff');
+  spread.setAttribute('aria-label', spread.title);
+  spread.setAttribute('aria-pressed', String(Boolean(p.spread)));
+  spread.innerHTML =
+    '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6.5C10 5 7 4.5 3 5v13c4-.5 7 0 9 1.5 2-1.5 5-2 9-1.5V5c-4-.5-7 0-9 1.5zM12 6.5v13" /></svg>';
+  spread.addEventListener('click', (e) => {
+    e.stopPropagation();
+    p.spread = !p.spread;
+    render(i);
+  });
+
+  const turn = document.createElement('button');
+  turn.className = 'pic-turn';
+  turn.type = 'button';
+  turn.title = t('turnPicture');
+  turn.setAttribute('aria-label', turn.title);
+  turn.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12a7 7 0 1 1-2.05-4.95M19 4v4h-4" /></svg>';
+  turn.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    turn.disabled = true;
+    await turnPicture(p);
+    if (!session?.items.includes(p)) return;
+    markSpreads(session.items, p);
+    render(session.items.indexOf(p));
+  });
+
+  li.append(img, num, remove, spread, turn);
   if (Number.isFinite(p.pageNumber)) {
     const page = document.createElement('span');
     page.className = 'pic-page';

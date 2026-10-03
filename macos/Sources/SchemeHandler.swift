@@ -6,13 +6,13 @@ import WebKit
 ///   pdbook://app/<path>            → Contents/Resources/web/<path>
 ///   pdbook://app/__doc/<id>/<name> → a PDF the user opened
 ///   pdbook://app/__lib/<name>      → a book in the library folder
-///   pdbook://app/__img/<id>/<name> → a picture for a new book, as an upright JPEG
+///   pdbook://app/__img/<id>/<name> → a picture for a new book: the page in it, as an upright JPEG
 final class SchemeHandler: NSObject, WKURLSchemeHandler {
     static let scheme = "pdbook"
 
     private let root: URL
     private var documents: [String: URL] = [:]
-    private var pictures: [String: URL] = [:]
+    private var pictures: [String: Pictures.Info] = [:]
     private var stopped = Set<ObjectIdentifier>()
 
     init(root: URL) {
@@ -28,9 +28,9 @@ final class SchemeHandler: NSObject, WKURLSchemeHandler {
     }
 
     /// Makes a picture reachable from the page (converted to JPEG) and returns its path.
-    func registerPicture(_ file: URL) -> String {
+    func registerPicture(_ info: Pictures.Info) -> String {
         let id = UUID().uuidString
-        pictures[id] = file
+        pictures[id] = info
         return "/__img/\(id)/picture.jpg"
     }
 
@@ -38,13 +38,13 @@ final class SchemeHandler: NSObject, WKURLSchemeHandler {
         guard let url = task.request.url else { return fail(task, code: NSURLErrorBadURL) }
         let parts = url.path.split(separator: "/").map(String.init)
         let picture = parts.first == "__img" && parts.count >= 2 ? pictures[parts[1]] : nil
-        guard let file = picture ?? resolve(url) else {
+        guard let file = picture?.url ?? resolve(url) else {
             return fail(task, code: NSURLErrorFileDoesNotExist)
         }
         let key = ObjectIdentifier(task)
         DispatchQueue.global(qos: .userInitiated).async {
             let data = picture != nil
-                ? Pictures.jpegData(file)
+                ? Pictures.jpegData(picture!)
                 : try? Data(contentsOf: file, options: .mappedIfSafe)
             DispatchQueue.main.async {
                 guard !self.stopped.contains(key) else {

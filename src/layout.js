@@ -3,10 +3,13 @@
 // so every spread is complete.
 import { readPageSizes, renderLogicalPage, countTextChars } from './pdf.js';
 import { t } from './i18n.js';
+import { SPREADS_KEYWORD } from './pictures.js';
 
 const COVER_THRESHOLD = 0.7;
 const SCAN_FRONT = 4; // how many leading pages to inspect for a cover
 const SCAN_BACK = 3;
+const SAMPLE = 8; // inside pages compared with a would-be back cover
+const STAND_OUT = 0.5; // how much more cover-like than those a back cover must be
 
 const median = (xs) => {
   const s = [...xs].sort((a, b) => a - b);
@@ -16,9 +19,11 @@ const median = (xs) => {
 /**
  * A PDF is treated as a "spread" PDF when its interior pages are landscape
  * and roughly twice as wide as its portrait pages (typically the covers).
- * Pure landscape documents such as slide decks are left alone.
+ * Pure landscape documents such as slide decks are left alone. Books made
+ * from pictures say so in their keywords.
  */
-function detectSpreads(sizes) {
+function detectSpreads(sizes, marked) {
+  if (marked) return sizes.some((s) => s.w / s.h > 1.15);
   const aspects = sizes.map((s) => s.w / s.h);
   const portrait = aspects.filter((a) => a < 0.95);
   const interior = aspects.slice(1, -1);
@@ -28,8 +33,8 @@ function detectSpreads(sizes) {
   return wide.length >= interior.length * 0.6;
 }
 
-function buildLogicalPages(sizes) {
-  const spreads = detectSpreads(sizes);
+function buildLogicalPages(sizes, marked) {
+  const spreads = detectSpreads(sizes, marked);
   const pages = [];
   sizes.forEach((s, i) => {
     const isWide = s.w / s.h > 1.15;
@@ -121,7 +126,13 @@ export async function findFrontCover(pdf) {
 export async function buildBook(pdf, onProgress = () => {}) {
   onProgress(t('measuring'));
   const sizes = await readPageSizes(pdf);
-  let { pages, spreads } = buildLogicalPages(sizes);
+  let marked = false;
+  try {
+    marked = String((await pdf.getMetadata()).info?.Keywords || '').includes(SPREADS_KEYWORD);
+  } catch {
+    // Metadata is optional.
+  }
+  let { pages, spreads } = buildLogicalPages(sizes, marked);
 
   onProgress(t('findingCover'));
   const cache = new Map();
@@ -140,11 +151,15 @@ export async function buildBook(pdf, onProgress = () => {}) {
       start = i + 1;
       continue;
     }
-    if (s.cover) frontCover = i;
+    if (s.cover && !pages[i].half) frontCover = i;
     break;
   }
 
-  // Back: skip trailing blanks; last real page is the back cover if cover-like.
+  // Back: skip trailing blanks; the last real page is the back cover only if
+  // it clearly is one: a whole page (never half of a double page) that looks
+  // much more like a cover than the pages inside. Photos of pages all look
+  // a bit cover-like, so a plain last page doesn't count. Otherwise a back
+  // cover is generated.
   let end = pages.length - 1;
   let backCover = null;
   for (let i = pages.length - 1; i > Math.max(start, pages.length - 1 - SCAN_BACK); i--) {
@@ -153,13 +168,21 @@ export async function buildBook(pdf, onProgress = () => {}) {
       end = i - 1;
       continue;
     }
-    if (s.cover && i !== frontCover && pages.length > 2) backCover = i;
+    if (s.cover && !pages[i].half && i !== frontCover && pages.length > 2) {
+      const inside = [];
+      const from = start + 1;
+      const count = Math.min(SAMPLE, i - from);
+      for (let k = 0; k < count; k++) inside.push((await stats(from + Math.floor((k * (i - from)) / count))).score);
+      if (!inside.length || s.score >= median(inside) + STAND_OUT) backCover = i;
+    }
     break;
   }
 
   const interior = [];
   for (let i = start; i <= end; i++) {
     if (i === frontCover || i === backCover) continue;
+    // The left half of a double page must land on a left-hand page.
+    if (pages[i].half === 'left' && interior.length % 2 === 1) interior.push({ kind: 'blank' });
     interior.push(pages[i]);
   }
   if (interior.length % 2 === 1) interior.push({ kind: 'blank' });

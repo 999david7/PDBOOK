@@ -3,10 +3,10 @@ import { openPdf, readTitle, renderLogicalPage, closePdf } from './pdf.js';
 import { buildBook } from './layout.js';
 import { PageTurner, FORWARD, BACK } from './turner.js';
 import { native } from './native.js';
-import { makeCover, makeBackCover } from './covers.js';
+import { makeCover, makeBackCover, makeFiller } from './covers.js';
 import { createLibrary } from './library.js';
 import { t, translateDocument } from './i18n.js';
-import { isPicture, sortPictures, guessTitle, readTakenTime, makePictureBook } from './pictures.js';
+import { isPicture, sortPictures, markSpreads, guessTitle, readTakenTime, findPage, makePictureBook } from './pictures.js';
 import { arrange, isArranging } from './arrange.js';
 import '@fontsource/fredoka/600.css';
 import '@fontsource/fredoka/700.css';
@@ -75,7 +75,9 @@ async function loadDocument(source) {
     const size = data.length; // pdf.js may transfer (detach) the buffer
     const pdf = await openPdf(data);
     if (loadId !== state.loadId) return closePdf(pdf);
-    const meta = await readTitle(pdf, name);
+    const own = await readTitle(pdf, name);
+    // A name given on the shelf wins over the title inside the PDF.
+    const meta = source.title ? { ...own, title: source.title } : own;
     const book = await buildBook(pdf, setLoading);
     if (loadId !== state.loadId) return closePdf(pdf);
 
@@ -93,7 +95,7 @@ async function loadDocument(source) {
     els.bottombar.hidden = false;
     els.scrubber.max = String(book.pages.length - 1);
 
-    state.posKey = `pdbook:pos:${meta.title}:${pdf.numPages}:${size}`;
+    state.posKey = `pdbook:pos:${own.title}:${pdf.numPages}:${size}`;
     const saved = Number(source.start ?? readStore(state.posKey)) || 0;
     buildFlip(Math.min(saved, book.pages.length - 1));
     setLoading(null);
@@ -229,6 +231,7 @@ function createPageEl(p, i, mode) {
     inner.append(makeBackCover(state.meta.title));
   } else {
     inner.classList.add('paper', 'blank');
+    inner.append(makeFiller());
   }
   return el;
 }
@@ -556,15 +559,18 @@ $('libPictures').addEventListener('click', pickPictures);
 /** Browser: pictures picked or dropped as File objects. */
 async function picturesFromFiles(files) {
   setLoading(t('opening'));
-  const pictures = await Promise.all(
-    files.map(async (file) => ({
+  const pictures = [];
+  for (const file of files) {
+    const { src, aspect } = await findPage(file); // one at a time: photos are big
+    pictures.push({
       name: file.name,
-      src: file,
+      src,
       modified: file.lastModified || null,
       taken: await readTakenTime(file),
       pageNumber: null,
-    })),
-  );
+      aspect,
+    });
+  }
   setLoading(null);
   makeBookFromPictures(pictures);
 }
@@ -576,7 +582,7 @@ async function picturesFromFiles(files) {
  */
 async function makeBookFromPictures(pictures, folder = '') {
   if (!pictures.length) return;
-  const { items, method } = sortPictures(pictures);
+  const { items, method } = sortPictures(markSpreads(pictures));
   const choice = await arrange(items, { method, title: guessTitle(items, folder) });
   if (!choice) return;
   try {
@@ -645,7 +651,7 @@ const library = createLibrary({
   root: els.library,
   onOpen: (book) => {
     if (native.active) native.post('library.open', { name: book.name });
-    else loadDocument({ url: book.url, name: book.name });
+    else loadDocument({ url: book.url, name: book.name, title: book.title });
   },
   onAddInBrowser: () => els.fileInput.click(),
 });
@@ -670,7 +676,7 @@ function showLibrary() {
 
 // API used by the macOS app's menus and Finder "Open With".
 window.pdbook = {
-  open: (url, name, start) => loadDocument({ url, name, start }),
+  open: (url, name, start, title) => loadDocument({ url, name, start, title }),
   library: (payload) => library.update(payload),
   showLibrary,
   toast: (text) => toast(text),
@@ -678,7 +684,8 @@ window.pdbook = {
     els.dropOverlay.firstElementChild.textContent = t(pictures ? 'dropPictures' : 'dropToAdd');
     els.dropOverlay.hidden = !on;
   },
-  // Pictures chosen in the Mac app, already analysed (capture time, page numbers).
+  // Pictures chosen in the Mac app, already analysed (page found and cropped,
+  // capture time, page numbers).
   pictures: (list, folder) =>
     makeBookFromPictures(
       list.map((p) => ({ ...p, src: p.url })),

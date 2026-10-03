@@ -10,7 +10,7 @@ Open any PDF as a book with realistic page-folding animations. PDBOOK is made fo
   - If the PDF has no cover, generates a cloth-bound cover from the PDF title, or from the file name when there is no title.
   - Splits PDFs that store two-page spreads on one sheet back into single pages. Slide decks stay as they are.
   - Pads the inside pages so every spread is complete.
-- **Books from pictures**: turn photos or scans of pages into a book. PDBOOK sorts them for you (see below).
+- **Books from pictures**: turn photos or scans of pages into a book. PDBOOK crops each page out of the photo, spots double pages and sorts them for you (see below).
 - **Lazy, sharp rendering**: only pages near the current one are rendered, at the screen's pixel density, and they are re-rendered when the size changes.
 
 ## Make a book from pictures
@@ -22,7 +22,9 @@ Click **Book from Pictures** on the shelf, use File ▸ New Book from Pictures�
 3. **When the photos were taken**, from their EXIF data.
 4. **The file date**, as a last resort.
 
-A sheet then shows the pictures in that order. Drag a picture to move it, or use Shift+← / → on a selected picture. Click × to leave a picture out, and change the title if you like. **Make Book** writes a PDF with one picture per page, and every page has the same size. The Mac app saves it in your library and opens it. In a browser it opens straight away; page-number reading needs the Mac app.
+Photos of a book lying on a table are cropped to the page first. The Mac app finds the page with macOS document detection, straightens it and turns sideways photos upright by the direction their text runs. A browser crops to the part that stands out from the table. Pictures about twice as wide as the single pages are **double pages**. In the book they fill a left and a right page together, and a filler page is added before one where needed so it always starts on the left. Filler pages are decorated, so they don't look like a mistake. The last picture only becomes the back cover if it clearly looks like one; otherwise PDBOOK makes a back cover to match the book.
+
+A sheet then shows the pictures in that order, with double pages as wide tiles. Drag a picture to move it, or use Shift+← / → on a selected picture. Click × to leave a picture out, the book button to switch a picture between single and double page, or the arrow to turn it. Change the title if you like. **Make Book** writes a PDF with one picture per page. Every page has the same size, and double pages are twice as wide. The Mac app saves it in your library and opens it. In a browser it opens straight away; page-number reading and turning photos upright automatically need the Mac app.
 
 JPEG, PNG, HEIC, TIFF, GIF and WebP all work in the Mac app. A browser can only use the formats it can display.
 
@@ -39,6 +41,7 @@ The Mac app keeps your books in a **“PDBOOK Library”** folder, in a location
 
   The shelf updates live.
 - **To keep a PDF you opened from elsewhere,** use **Add to Library** (⌘D).
+- **To rename a book,** hover over it, click the pencil, type the new name and press Return (Esc cancels). The file in the library folder is renamed too. The new name replaces the title stored inside the PDF on the shelf and in the reader, without changing the PDF itself. In a browser, the new names are remembered in that browser.
 - **To remove a book,** hover over it and click the trash icon. The file goes to the macOS Trash, so it can be restored. Deleted samples stay deleted; File ▸ Restore Sample Books brings them back.
 - **To move the library,** use File ▸ Change Library Location…. To open the folder, use File ▸ Show Library in Finder.
 - **To return to the shelf** from a book, use ⌘L.

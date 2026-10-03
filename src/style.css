@@ -535,6 +535,35 @@ input[type='range']::-moz-range-thumb {
     var(--cloth);
 }
 
+/* A page the layout left empty (so a double page starts on the left, or the
+   last spread is complete): sprinkled stars round a small badge. */
+.filler {
+  position: absolute;
+  inset: 0;
+  container-type: size;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(circle at 18% 22%, color-mix(in srgb, var(--sun) 55%, transparent) 0 1.2cqmin, transparent 1.4cqmin),
+    radial-gradient(circle at 78% 16%, color-mix(in srgb, var(--sky-blue) 40%, transparent) 0 0.9cqmin, transparent 1.1cqmin),
+    radial-gradient(circle at 84% 70%, color-mix(in srgb, var(--coral) 40%, transparent) 0 1.1cqmin, transparent 1.3cqmin),
+    radial-gradient(circle at 24% 82%, color-mix(in srgb, var(--sky-blue) 35%, transparent) 0 1cqmin, transparent 1.2cqmin),
+    radial-gradient(circle at 56% 90%, color-mix(in srgb, var(--sun) 45%, transparent) 0 0.8cqmin, transparent 1cqmin),
+    radial-gradient(circle at 44% 10%, color-mix(in srgb, var(--coral) 30%, transparent) 0 0.7cqmin, transparent 0.9cqmin);
+}
+
+.filler-badge {
+  width: 26cqmin;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  border: 0.8cqmin dashed color-mix(in srgb, var(--sun-dark) 45%, transparent);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--sun) 16%, transparent);
+  color: color-mix(in srgb, var(--sun-dark) 70%, transparent);
+  font: 700 12cqmin/1 var(--fun-font);
+}
+
 /* ---------------------------------------------------------------- arrows */
 
 .nav-arrow {
@@ -930,10 +959,70 @@ input[type='range']::-moz-range-thumb {
   transform: scale(1.1) rotate(-8deg);
 }
 
+.book-rename {
+  position: absolute;
+  top: -6px;
+  left: 6px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 3px solid #fff;
+  background: var(--sky-blue);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 3px 0 var(--sky-blue-dark), 0 6px 12px -4px rgba(43, 45, 66, 0.4);
+  opacity: 0;
+  transform: scale(0.6);
+  transition:
+    opacity 0.15s,
+    transform 0.2s cubic-bezier(0.3, 1.6, 0.5, 1);
+  z-index: 3;
+}
+
+.book-rename svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.book-card:hover .book-rename,
+.book-card:focus-within .book-rename {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.book-rename:hover {
+  transform: scale(1.1) rotate(8deg);
+}
+
+.book-card.is-renaming .book-title {
+  display: block;
+  overflow: visible;
+}
+
+.book-title input {
+  width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+  text-align: center;
+  color: var(--ink);
+  padding: 4px 8px;
+  border: 3px solid var(--sky-blue);
+  border-radius: 12px;
+  background: #fff;
+  outline: none;
+}
+
 /* On touch screens (tablets in class) there's no hover, so keep the delete
-   button out of reach of curious fingers. */
+   and rename buttons out of reach of curious fingers. */
 @media (hover: none) {
-  .book-remove {
+  .book-remove,
+  .book-rename {
     display: none;
   }
 }
@@ -1172,6 +1261,22 @@ input[type='range']::-moz-range-thumb {
   transition: transform 0.15s;
 }
 
+.pic.spread {
+  grid-column: span 2;
+  aspect-ratio: 3 / 2;
+}
+
+/* The fold between the two halves of a double page. */
+.pic.spread::after {
+  content: '';
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  left: 50%;
+  border-left: 2px dashed rgba(43, 45, 66, 0.35);
+  pointer-events: none;
+}
+
 .pic:hover {
   transform: translateY(-2px);
 }
@@ -1257,6 +1362,51 @@ input[type='range']::-moz-range-thumb {
   opacity: 1;
 }
 
+.pic-spread,
+.pic-turn {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(43, 45, 66, 0.72);
+  color: #fff;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.pic-turn {
+  right: auto;
+  left: 8px;
+}
+
+.pic.spread .pic-spread {
+  background: var(--sky-blue);
+  opacity: 1;
+}
+
+.pic:hover :is(.pic-spread, .pic-turn),
+.pic:focus-within :is(.pic-spread, .pic-turn),
+.pic:focus :is(.pic-spread, .pic-turn) {
+  opacity: 1;
+}
+
+.pic-spread svg,
+.pic-turn svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 .pic-remove svg {
   width: 14px;
   height: 14px;
@@ -1319,7 +1469,9 @@ input[type='range']::-moz-range-thumb {
     padding: 12px 14px;
   }
 
-  .pic-remove {
+  .pic-remove,
+  .pic-spread,
+  .pic-turn {
     opacity: 1;
   }
 }

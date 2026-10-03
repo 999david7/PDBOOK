@@ -134,16 +134,65 @@ final class Library {
     /// Writes a new book (one made from pictures) into the library, or into a
     /// temporary folder while there is no library yet. Returns its location.
     func save(_ data: Data, title: String) throws -> URL {
+        let dir = folder ?? fm.temporaryDirectory
+        let target = uniqueDestination(for: fileName(for: title), in: dir)
+        try data.write(to: target, options: .atomic)
+        notify()
+        return target
+    }
+
+    /// Renames a book: the file gets the new name and the title is kept with
+    /// it (an extended attribute), so it shows instead of the title inside the
+    /// PDF without rewriting the PDF. Returns the book's new location.
+    func rename(_ url: URL, to title: String) throws -> URL {
+        let title = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !title.isEmpty else { return url }
+        var target = url
+        let name = fileName(for: title)
+        if name.compare(url.lastPathComponent, options: .caseInsensitive) == .orderedSame {
+            if name != url.lastPathComponent { // only the case changes
+                target = url.deletingLastPathComponent().appendingPathComponent(name)
+                try fm.moveItem(at: url, to: target)
+            }
+        } else {
+            target = uniqueDestination(for: name, in: url.deletingLastPathComponent())
+            try fm.moveItem(at: url, to: target)
+        }
+        Self.setTitle(title, of: target)
+        notify()
+        return target
+    }
+
+    private static let titleAttribute = "com.pdbook.title"
+
+    /// The title the user gave a book, if they renamed it.
+    static func title(of url: URL) -> String? {
+        url.withUnsafeFileSystemRepresentation { path -> String? in
+            guard let path else { return nil }
+            let size = getxattr(path, titleAttribute, nil, 0, 0, 0)
+            guard size > 0 else { return nil }
+            var bytes = [UInt8](repeating: 0, count: size)
+            guard getxattr(path, titleAttribute, &bytes, size, 0, 0) == size else { return nil }
+            return String(bytes: bytes, encoding: .utf8)
+        }
+    }
+
+    private static func setTitle(_ title: String, of url: URL) {
+        let bytes = Array(title.utf8)
+        url.withUnsafeFileSystemRepresentation { path in
+            guard let path else { return }
+            _ = setxattr(path, titleAttribute, bytes, bytes.count, 0, 0)
+        }
+    }
+
+    /// A safe file name for a book called `title`.
+    private func fileName(for title: String) -> String {
         var name = title.components(separatedBy: CharacterSet(charactersIn: "/:\\"))
             .joined(separator: "-")
             .trimmingCharacters(in: .whitespacesAndNewlines)
         while name.hasPrefix(".") { name.removeFirst() }
         if name.isEmpty { name = tr("Picture Book", "Bilderbuch") }
-        let dir = folder ?? fm.temporaryDirectory
-        let target = uniqueDestination(for: String(name.prefix(120)) + ".pdf", in: dir)
-        try data.write(to: target, options: .atomic)
-        notify()
-        return target
+        return String(name.prefix(120)) + ".pdf"
     }
 
     func moveToTrash(_ url: URL, completion: @escaping (Error?) -> Void) {
@@ -181,12 +230,14 @@ final class Library {
         let books: [[String: Any]] = books().map { book in
             let name = book.url.lastPathComponent
             let encoded = name.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? name
-            return [
+            var entry: [String: Any] = [
                 "name": name,
                 "size": book.size,
                 "mtime": Int(book.modified.timeIntervalSince1970 * 1000),
                 "url": "/__lib/\(encoded)",
             ]
+            if let title = Self.title(of: book.url) { entry["title"] = title }
+            return entry
         }
         return ["configured": true, "location": display, "books": books]
     }

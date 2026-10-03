@@ -101,7 +101,8 @@ final class BookWindowController: NSWindowController, NSWindowDelegate, NSToolba
     private func send(_ url: URL) {
         let path = scheme.register(url)
         let start = (UserDefaults.standard.dictionary(forKey: Self.positionsKey)?[url.path] as? Int) ?? 0
-        run("window.pdbook.open(\(js(path)), \(js(url.lastPathComponent)), \(start))")
+        let title = Library.title(of: url).map(js) ?? "null"
+        run("window.pdbook.open(\(js(path)), \(js(url.lastPathComponent)), \(start), \(title))")
     }
 
     private func run(_ script: String) {
@@ -147,6 +148,10 @@ final class BookWindowController: NSWindowController, NSWindowDelegate, NSToolba
             if let name = body["name"] as? String, let url = Library.shared.file(named: name) {
                 AppDelegate.shared.open(url, preferring: self)
             }
+        case "library.rename":
+            if let name = body["name"] as? String, let title = body["title"] as? String {
+                renameBook(name: name, title: title)
+            }
         case "library.add":
             AppDelegate.shared.addBooks(for: self)
         case "library.remove":
@@ -187,6 +192,22 @@ final class BookWindowController: NSWindowController, NSWindowDelegate, NSToolba
         run("window.pdbook.toast(\(js(text)))")
     }
 
+    private func renameBook(name: String, title: String) {
+        guard let url = Library.shared.file(named: name) else { return }
+        do {
+            let renamed = try Library.shared.rename(url, to: title)
+            // Keep the reading position, which is remembered per file.
+            var positions = UserDefaults.standard.dictionary(forKey: Self.positionsKey) ?? [:]
+            if renamed != url, let index = positions.removeValue(forKey: url.path) {
+                positions[renamed.path] = index
+                UserDefaults.standard.set(positions, forKey: Self.positionsKey)
+            }
+        } catch {
+            pushLibrary() // show the old name again
+            if let window { NSAlert(error: error).beginSheetModal(for: window) }
+        }
+    }
+
     private func confirmRemove(name: String, title: String) {
         guard let url = Library.shared.file(named: name), let window else { return }
         let alert = NSAlert()
@@ -205,8 +226,9 @@ final class BookWindowController: NSWindowController, NSWindowDelegate, NSToolba
 
     // MARK: - Book from pictures
 
-    /// Reads capture times and printed page numbers, then hands the pictures
-    /// to the page, which sorts them and lets the user check the order.
+    /// Finds the pages in the photos and reads capture times and printed page
+    /// numbers, then hands the pictures to the page, which sorts them and lets
+    /// the user check the order.
     func makeBook(from urls: [URL]) {
         let files = Pictures.collect(urls)
         guard !files.isEmpty else {
@@ -225,11 +247,12 @@ final class BookWindowController: NSWindowController, NSWindowDelegate, NSToolba
             }
             let ms = { (date: Date?) -> Any in date.map { Int($0.timeIntervalSince1970 * 1000) } ?? NSNull() }
             let list: [[String: Any]] = infos.map { info in [
-                "url": self.scheme.registerPicture(info.url),
+                "url": self.scheme.registerPicture(info),
                 "name": info.url.lastPathComponent,
                 "taken": ms(info.taken),
                 "modified": ms(info.modified),
                 "pageNumber": info.pageNumber ?? NSNull(),
+                "aspect": info.aspect,
             ] }
             let parents = Set(infos.map { $0.url.deletingLastPathComponent() })
             let folder = parents.count == 1 ? parents.first!.lastPathComponent : ""
